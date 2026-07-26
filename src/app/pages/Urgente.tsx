@@ -1,0 +1,210 @@
+import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Button } from '../components/ui/button';
+import { Card } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
+import { Alert, AlertTitle, AlertDescription } from '../components/ui/alert';
+import { ChevronLeft, Wrench, AlertTriangle, MapPin, Search, CheckCircle, ShieldAlert } from 'lucide-react';
+import { toast } from 'sonner';
+
+export default function Urgente() {
+  const navigate = useNavigate();
+  
+  const [urgencyType, setUrgencyType] = useState('vazamento');
+  const [description, setDescription] = useState('');
+  const [address, setAddress] = useState('Av. Paulista, 1000 - Bela Vista, São Paulo - SP');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchComplete, setSearchComplete] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!description.trim() || !address.trim()) {
+      toast.error('Preencha todos os campos para continuar.');
+      return;
+    }
+
+    setIsSearching(true);
+    
+    // Simulate searching for 3 seconds
+    setTimeout(() => {
+      setIsSearching(false);
+      setSearchComplete(true);
+      toast.success('Profissional de emergência encontrado!');
+    }, 3000);
+  };
+
+  const emergencyOptions = [
+    { id: 'vazamento', label: 'Vazamento Incontrolável', desc: 'Canos estourados, alagamentos' },
+    { id: 'energia', label: 'Curto-Circuito / Sem Luz', desc: 'Falta de energia total, faíscas no quadro' },
+    { id: 'chaveiro', label: 'Porta Trancada', desc: 'Perda de chaves, fechadura quebrada' },
+  ];
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <button
+              onClick={() => navigate('/home')}
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors bg-transparent border-0 cursor-pointer text-sm font-medium"
+            >
+              <ChevronLeft className="h-5 w-5" />
+              <span>Voltar</span>
+            </button>
+            <Link to="/" className="flex items-center gap-2">
+              <Wrench className="h-6 w-6 text-secondary" />
+              <span className="text-lg font-semibold text-foreground">FazTudo+</span>
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="space-y-6">
+          {/* Warning Banner */}
+          <Alert className="bg-accent/10 border-accent/30 text-foreground rounded-2xl p-4 flex gap-3">
+            <AlertTriangle className="h-6 w-6 text-accent flex-shrink-0" />
+            <div>
+              <AlertTitle className="font-bold text-foreground text-sm">Serviço de Emergência Urgente</AlertTitle>
+              <AlertDescription className="text-xs text-muted-foreground mt-1">
+                Ao solicitar esta modalidade, nossa plataforma busca ativamente prestadores verificados num raio de até 5km prontos para atendimento imediato. Taxa de deslocamento fixa de R$ 50 incluída.
+              </AlertDescription>
+            </div>
+          </Alert>
+
+          {!isSearching && !searchComplete ? (
+            <Card className="p-6 sm:p-10 border border-border shadow-sm">
+              <h1 className="text-2xl font-bold text-foreground mb-6">Solicitar Atendimento Imediato</h1>
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Select Type of Emergency */}
+                <div className="space-y-3">
+                  <Label>Qual é a sua emergência?</Label>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {emergencyOptions.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setUrgencyType(opt.id)}
+                        className={`text-left p-4 rounded-xl border-2 transition-all flex flex-col justify-between bg-card cursor-pointer h-24 ${
+                          urgencyType === opt.id
+                            ? 'border-accent bg-accent/5'
+                            : 'border-border hover:border-muted-foreground/30'
+                        }`}
+                      >
+                        <span className="font-semibold text-sm text-foreground">{opt.label}</span>
+                        <span className="text-xs text-muted-foreground leading-tight mt-1">{opt.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-2">
+                  <Label htmlFor="description">Descreva brevemente o problema</Label>
+                  <Textarea
+                    id="description"
+                    rows={3}
+                    placeholder="Ex: Cano de entrada da cozinha estourou e está vazando muita água. Preciso fechar/reparar urgente."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    required
+                    className="bg-input-background"
+                  />
+                </div>
+
+                {/* Address */}
+                <div className="space-y-2">
+                  <Label htmlFor="address">Endereço de Atendimento</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input
+                      id="address"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      required
+                      className="pl-10 bg-input-background"
+                    />
+                  </div>
+                </div>
+
+                {/* Call Action Button */}
+                <Button type="submit" variant="secondary" className="w-full h-12 text-base font-bold bg-accent hover:bg-accent/90 text-foreground">
+                  <AlertTriangle className="h-5 w-5 mr-2 animate-bounce" />
+                  Chamar Profissional de Emergência
+                </Button>
+              </form>
+            </Card>
+          ) : isSearching ? (
+            /* Searching Interface */
+            <Card className="p-8 sm:p-12 text-center border border-border shadow-sm space-y-6">
+              <div className="relative flex justify-center py-6">
+                <div className="absolute h-24 w-24 rounded-full bg-accent/20 animate-ping" />
+                <div className="relative bg-accent p-6 rounded-full text-foreground shadow-lg">
+                  <Search className="h-12 w-12 animate-spin" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold text-foreground">Buscando Profissional Próximo...</h2>
+                <p className="text-muted-foreground text-sm max-w-sm mx-auto leading-relaxed">
+                  Estamos contactando eletricistas/encanadores verificados num raio de até 5km. Por favor, mantenha esta página aberta.
+                </p>
+              </div>
+
+              <div className="bg-muted/50 p-4 rounded-xl inline-flex items-center gap-2 text-xs text-muted-foreground max-w-sm border border-border text-left mx-auto">
+                <ShieldAlert className="h-5 w-5 text-accent flex-shrink-0" />
+                <span>Nossos parceiros urgência possuem nota mínima de 4.8 e verificação criminal aprovada.</span>
+              </div>
+            </Card>
+          ) : (
+            /* Search Complete/Success Interface */
+            <Card className="p-8 sm:p-12 text-center border border-border shadow-sm space-y-6">
+              <div className="flex justify-center">
+                <div className="bg-success/15 p-4 rounded-full text-success">
+                  <CheckCircle className="h-16 w-16" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold text-foreground">Profissional Encontrado!</h2>
+                <p className="text-muted-foreground text-sm max-w-sm mx-auto leading-relaxed">
+                  **Carlos Silva (Eletricista)** aceitou o seu chamado e está a caminho de sua residência.
+                </p>
+              </div>
+
+              <div className="max-w-md mx-auto bg-muted/40 p-4 rounded-xl border border-border text-left space-y-3">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-sm font-bold text-foreground">Carlos Silva</p>
+                    <p className="text-xs text-muted-foreground">Eletricista - ⭐ 4.9 (127 avaliações)</p>
+                  </div>
+                  <Badge className="bg-success/15 text-success border-success/20">A caminho</Badge>
+                </div>
+                <div className="text-xs space-y-1 border-t border-border pt-3 text-muted-foreground">
+                  <p><strong>Tempo estimado de chegada:</strong> 12 minutos</p>
+                  <p><strong>Taxa fixa de atendimento:</strong> R$ 50,00 + serviço a combinar</p>
+                </div>
+              </div>
+
+              <div className="pt-4 flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+                <Button variant="outline" className="flex-1" onClick={() => navigate('/home')}>
+                  Ir para a Home
+                </Button>
+                <Link to="/chat/1" className="flex-1">
+                  <Button variant="secondary" className="w-full">
+                    Abrir Chat com Carlos
+                  </Button>
+                </Link>
+              </div>
+            </Card>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
