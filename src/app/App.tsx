@@ -39,6 +39,7 @@ export default function App() {
         <Route path="/prestador/:id" element={<ProviderProfile />} />
         <Route path="/chat/:id" element={<Chat />} />
         <Route path="/dashboard" element={<ProviderDashboard />} />
+        <Route path="/dashboard/:section" element={<ProviderDashboard />} />
         <Route path="/login" element={<Login />} />
         <Route path="/cadastro" element={<Signup />} />
         <Route path="/termos" element={<Termos />} />
