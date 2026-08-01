@@ -4,8 +4,19 @@ import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { CheckCircle2, Shield, Star, Wrench, Zap, Droplet, Box, ArrowRight, CheckCircle, Wind, ShieldCheck, Sparkles, Truck, Flame, Wifi, Layers } from 'lucide-react';
 import { serviceCategories } from '../lib/categoriesData';
+import { useEffect, useState } from 'react';
+import { apiGet } from '../lib/api';
 
 export default function LandingPage() {
+  const [categories, setCategories] = useState<any[]>([]);
+
+  useEffect(() => {
+    apiGet<any[]>('/api/categories').then((data) => {
+      if (data) {
+        setCategories(data);
+      }
+    });
+  }, []);
   return (
     <div className="min-h-screen bg-background">
       {/* Navbar */}
@@ -138,37 +149,50 @@ export default function LandingPage() {
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {serviceCategories.slice(0, 6).map((cat) => (
-              <Card key={cat.id} className="p-6 hover:shadow-xl transition-all duration-300 border-2 hover:border-secondary flex flex-col justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold mb-2 text-foreground">{cat.name}</h3>
-                  <p className="text-sm text-muted-foreground mb-4">{cat.description}</p>
-                  <div className="flex flex-wrap gap-1.5 mb-6">
-                    {cat.subcategories.slice(0, 4).map((sub) => (
-                      <span key={sub} className="text-xs bg-secondary/10 text-secondary font-medium px-2 py-0.5 rounded-full">
-                        {sub}
-                      </span>
-                    ))}
-                    {cat.subcategories.length > 4 && (
-                      <span className="text-xs text-muted-foreground font-medium px-1 py-0.5">
-                        +{cat.subcategories.length - 4} mais
-                      </span>
-                    )}
+            {(categories.length > 0 ? categories : serviceCategories.slice(0, 3)).map((cat) => {
+              // Find matching details from static data to retain description/subcategories if matched
+              const matchedStatic = serviceCategories.find(
+                (sc) =>
+                  sc.name.toLowerCase() === cat.name.toLowerCase() ||
+                  sc.id === cat.slug ||
+                  (cat.slug && sc.id.includes(cat.slug))
+              );
+
+              const description = matchedStatic?.description ?? 'Serviços especializados locais.';
+              const subcategories = matchedStatic?.subcategories ?? [cat.name];
+
+              return (
+                <Card key={cat.id} className="p-6 hover:shadow-xl transition-all duration-300 border-2 hover:border-secondary flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold mb-2 text-foreground">{cat.name}</h3>
+                    <p className="text-sm text-muted-foreground mb-4">{description}</p>
+                    <div className="flex flex-wrap gap-1.5 mb-6">
+                      {subcategories.slice(0, 4).map((sub) => (
+                        <span key={sub} className="text-xs bg-secondary/10 text-secondary font-medium px-2 py-0.5 rounded-full">
+                          {sub}
+                        </span>
+                      ))}
+                      {subcategories.length > 4 && (
+                        <span className="text-xs text-muted-foreground font-medium px-1 py-0.5">
+                          +{subcategories.length - 4} mais
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <Link to={`/home?categoria=${cat.id}`}>
-                  <Button variant="ghost" className="p-0 h-auto font-semibold text-secondary hover:text-secondary/80">
-                    Ver profissionais <ArrowRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </Link>
-              </Card>
-            ))}
+                  <Link to={`/home?categoria=${cat.slug || cat.id}`}>
+                    <Button variant="ghost" className="p-0 h-auto font-semibold text-secondary hover:text-secondary/80">
+                      Ver profissionais <ArrowRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </Link>
+                </Card>
+              );
+            })}
           </div>
 
           <div className="mt-10 text-center">
             <Link to="/home">
               <Button size="lg" variant="outline" className="border-2 font-semibold">
-                Explorar todas as {serviceCategories.length} categorias e subcategorias
+                Explorar todas as {categories.length || serviceCategories.length} categorias e subcategorias
                 <ArrowRight className="h-5 w-5 ml-2" />
               </Button>
             </Link>

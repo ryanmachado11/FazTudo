@@ -1,35 +1,29 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Avatar, AvatarFallback } from '../components/ui/avatar';
-import { ChevronLeft, Wrench, Save, X, Plus, Trash } from 'lucide-react';
+import { ChevronLeft, Wrench, Save, X, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { serviceCategories } from '../lib/categoriesData';
+import { apiGet, apiPut } from '../lib/api';
+import { getCurrentUser } from '../lib/session';
 
 export default function PerfilEditar() {
   const navigate = useNavigate();
+  const currentUser = getCurrentUser();
 
-  // Mock initial provider profile data
-  const [name, setName] = useState('Carlos Silva');
+  const [name, setName] = useState(currentUser?.name || '');
   const [category, setCategory] = useState('Eletricista');
-  const [price, setPrice] = useState('A partir de R$ 80');
-  const [region, setRegion] = useState('Zona Sul - São Paulo');
-  const [description, setDescription] = useState(
-    'Profissional com mais de 10 anos de experiência em instalações elétricas residenciais e comerciais. Atendimento rápido e preço justo.'
-  );
-  
-  // Specialties list management
-  const [specialties, setSpecialties] = useState<string[]>([
-    'Instalação elétrica',
-    'Manutenção',
-    'Emergências',
-    'Automação residencial',
-  ]);
+  const [price, setPrice] = useState('');
+  const [region, setRegion] = useState('');
+  const [description, setDescription] = useState('');
+  const [specialties, setSpecialties] = useState<string[]>([]);
   const [newSpecialty, setNewSpecialty] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [availableCategories, setAvailableCategories] = useState<any[]>([]);
 
   const handleAddSpecialty = () => {
     if (newSpecialty.trim() && !specialties.includes(newSpecialty.trim())) {
@@ -42,10 +36,57 @@ export default function PerfilEditar() {
     setSpecialties(specialties.filter((spec) => spec !== specToRemove));
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const categories = await apiGet<any[]>('/api/categories');
+        setAvailableCategories(categories);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    const loadProfile = async () => {
+      try {
+        const profile = await apiGet<any>('/api/provider/profile/me');
+        setName(profile.name || currentUser?.name || '');
+        setDescription(profile.bio || '');
+        setRegion([profile.city, profile.neighborhood, profile.state].filter(Boolean).join(' - '));
+        setPrice(profile.hourlyRate ? `A partir de R$ ${Number(profile.hourlyRate).toFixed(2)}` : '');
+        setCategory(profile.category || 'Eletricista');
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    loadCategories();
+    loadProfile();
+  }, [currentUser?.name]);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Perfil atualizado com sucesso!');
-    navigate('/dashboard');
+    setIsSaving(true);
+
+    try {
+      const categoryMatch = availableCategories.find((cat) => cat.name === category);
+      const categoryIds = categoryMatch ? [categoryMatch.id] : [];
+
+      await apiPut('/api/provider/profile/me', {
+        bio: description,
+        city: region.split(' - ')[0] || '',
+        neighborhood: region.split(' - ')[1] || '',
+        state: region.split(' - ')[2] || '',
+        hourlyRate: Number(price.replace(/[^0-9,]/g, '').replace(',', '.')) || 0,
+        isUrgentAvailable: true,
+        categoryIds,
+      });
+      toast.success('Perfil atualizado com sucesso!');
+      navigate('/dashboard');
+    } catch (error: any) {
+      toast.error(error?.message || 'Não foi possível salvar o perfil.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -123,11 +164,13 @@ export default function PerfilEditar() {
                     onChange={(e) => setCategory(e.target.value)}
                     className="w-full h-11 px-3 rounded-lg border border-border bg-input-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   >
-                    {serviceCategories.map((cat) => (
+                    {availableCategories.length > 0 ? availableCategories.map((cat) => (
                       <option key={cat.id} value={cat.name}>
                         {cat.name}
                       </option>
-                    ))}
+                    )) : (
+                      <option value="Eletricista">Eletricista</option>
+                    )}
                   </select>
                 </div>
               </div>
@@ -217,9 +260,9 @@ export default function PerfilEditar() {
               <Button type="button" variant="outline" onClick={() => navigate('/dashboard')} className="px-6">
                 Cancelar
               </Button>
-              <Button type="submit" variant="secondary" className="px-6">
+              <Button type="submit" variant="secondary" className="px-6" disabled={isSaving}>
                 <Save className="h-4 w-4 mr-2" />
-                Salvar Alterações
+                {isSaving ? 'Salvando...' : 'Salvar Alterações'}
               </Button>
             </div>
           </form>

@@ -1,0 +1,60 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FazTudo+ API",
+    "version": "1.0.0",
+    "description": "API segura para o marketplace de serviços locais do FazTudo+"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Servidor disponível"
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "summary": "Cadastro de usuário",
+        "responses": {
+          "201": {
+            "description": "Usuário criado"
+          }
+        }
+      }
+    },
+    "/api/categories": {
+      "get": {
+        "summary": "Listar categorias do MVP",
+        "responses": {
+          "200": {
+            "description": "Categorias disponíveis"
+          }
+        }
+      }
+    },
+    "/api/providers": {
+      "get": {
+        "summary": "Listar prestadores",
+        "responses": {
+          "200": {
+            "description": "Lista de prestadores"
+          }
+        }
+      }
+    },
+    "/api/services": {
+      "post": {
+        "summary": "Criar solicitação de serviço",
+        "responses": {
+          "201": {
+            "description": "Serviço criado"
+          }
+        }
+      }
+    }
+  }
+}

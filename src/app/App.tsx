@@ -12,6 +12,9 @@ import RecuperarSenha from './pages/RecuperarSenha';
 import CadastroPrestador from './pages/CadastroPrestador';
 import PerfilEditar from './pages/PerfilEditar';
 import Urgente from './pages/Urgente';
+import ClientServices from './pages/ClientServices';
+import Messages from './pages/Messages';
+import { Toaster } from './components/ui/sonner';
 
 function NotFound() {
   return (
@@ -37,6 +40,7 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/home" element={<ClientHome />} />
         <Route path="/prestador/:id" element={<ProviderProfile />} />
+        <Route path="/chat/servico/:serviceRequestId" element={<Chat />} />
         <Route path="/chat/:id" element={<Chat />} />
         <Route path="/dashboard" element={<ProviderDashboard />} />
         <Route path="/login" element={<Login />} />
@@ -47,8 +51,11 @@ export default function App() {
         <Route path="/cadastro-prestador" element={<CadastroPrestador />} />
         <Route path="/perfil/editar" element={<PerfilEditar />} />
         <Route path="/urgente" element={<Urgente />} />
+        <Route path="/servicos" element={<ClientServices />} />
+        <Route path="/mensagens" element={<Messages />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+      <Toaster />
     </BrowserRouter>
   );
 }

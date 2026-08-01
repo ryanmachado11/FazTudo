@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -6,16 +6,37 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Separator } from '../components/ui/separator';
 import { Wrench } from 'lucide-react';
+import { toast } from 'sonner';
+import { apiPost } from '../lib/api';
 
 export default function Signup() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Signup:', { name, email, phone, password });
+    setIsSubmitting(true);
+
+    try {
+      await apiPost('/api/auth/register', {
+        name,
+        email,
+        phone,
+        password,
+        role: 'CLIENT',
+      });
+
+      toast.success('Cadastro realizado com sucesso! Faça login para continuar.');
+      navigate('/login');
+    } catch (error: any) {
+      toast.error(error?.message || 'Falha ao cadastrar.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -87,8 +108,8 @@ export default function Signup() {
               />
             </div>
 
-            <Button type="submit" variant="secondary" size="lg" className="w-full">
-              Cadastrar
+            <Button type="submit" variant="secondary" size="lg" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? 'Enviando...' : 'Cadastrar'}
             </Button>
           </form>
 

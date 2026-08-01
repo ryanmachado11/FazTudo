@@ -8,7 +8,9 @@ import { Separator } from '../components/ui/separator';
 import { Badge } from '../components/ui/badge';
 import { Wrench, ChevronLeft, ShieldCheck, Upload, User, FileText, Camera, CheckCircle2, Clock } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiGet, apiPost } from '../lib/api';
 import { serviceCategories } from '../lib/categoriesData';
+import { saveSession } from '../lib/session';
 
 export default function CadastroPrestador() {
   const navigate = useNavigate();
@@ -18,11 +20,21 @@ export default function CadastroPrestador() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [category, setCategory] = useState(serviceCategories[0].id);
   const [subcategory, setSubcategory] = useState(serviceCategories[0].subcategories[0]);
   const [experience, setExperience] = useState('');
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fileToDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('Não foi possível ler o arquivo selecionado.'));
+      reader.readAsDataURL(file);
+    });
 
   const handleNextStep = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,11 +51,88 @@ export default function CadastroPrestador() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate validation and submit
-    toast.success('Cadastro enviado com sucesso para análise!');
-    setStep(4); // Verification Status Step
+
+    if (!name.trim() || !email.trim() || !phone.trim() || !password.trim()) {
+      toast.error('Preencha nome, e-mail, telefone e senha antes de enviar o cadastro.');
+      return;
+    }
+
+    if (!documentFile || !selfieFile) {
+      toast.error('É necessário enviar o documento e a selfie para concluir o cadastro.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // 1. Register the provider
+      await apiPost('/api/auth/register', {
+        name,
+        email,
+        phone,
+        password,
+        role: 'PROVIDER',
+      });
+
+      // 2. Perform automatic login to authenticate the session
+      const loginRes: any = await apiPost('/api/auth/login', {
+        email,
+        password,
+      });
+      
+      const sessionData = {
+        accessToken: loginRes.accessToken,
+        refreshToken: loginRes.refreshToken,
+        user: loginRes.user,
+      };
+      saveSession(sessionData);
+
+      // 3. Match category selection with DB categories
+      const dbCategories = await apiGet<any[]>('/api/categories');
+      const categorySlugMap: Record<string, string> = {
+        'eletrica': 'eletricista',
+        'hidraulica': 'encanador',
+        'montagem-instalacao': 'montador-de-moveis',
+      };
+      const targetSlug = categorySlugMap[category] || 'eletricista';
+      const matchedDbCategory = dbCategories.find(c => c.slug === targetSlug) || dbCategories[0];
+
+      const [documentFrontImage, documentBackImage, selfieImage] = await Promise.all([
+        documentFile ? fileToDataUrl(documentFile) : Promise.resolve(''),
+        documentFile ? fileToDataUrl(documentFile) : Promise.resolve(''),
+        selfieFile ? fileToDataUrl(selfieFile) : Promise.resolve(''),
+      ]);
+
+      // 4. Submit documents for verification and create the provider profile in the database
+      await apiPost('/api/auth/verification', {
+        documentType: 'RG',
+        bio: `Profissional especializado em ${subcategory}. Experiência: ${experience}.`,
+        city: 'São Paulo',
+        state: 'SP',
+        isUrgentAvailable: true,
+        categoryIds: matchedDbCategory ? [matchedDbCategory.id] : [],
+        documentFrontImage,
+        documentBackImage,
+        selfieImage,
+      });
+
+      toast.success('Cadastro enviado com sucesso para análise!');
+      setStep(4); // Verification Status Step
+    } catch (error: any) {
+      toast.error(error?.message || 'Falha ao enviar cadastro.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGoToDashboard = () => {
+    navigate('/dashboard', { replace: true });
+  };
+
+  const handleGoToProfileEdit = () => {
+    navigate('/perfil/editar', { replace: true });
   };
 
   return (
@@ -119,9 +208,10 @@ export default function CadastroPrestador() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Celular (WhatsApp)</Label>
+                    <Label htmlFor="phone">Telefone</Label>
                     <Input
                       id="phone"
+                      type="tel"
                       placeholder="(11) 99999-9999"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
@@ -129,9 +219,19 @@ export default function CadastroPrestador() {
                       className="bg-input-background"
                     />
                   </div>
-                </div>
-
-                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Senha</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="Mínimo 8 caracteres"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      minLength={8}
+                      className="bg-input-background"
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="category">Categoria Principal</Label>
                     <select
@@ -299,8 +399,8 @@ export default function CadastroPrestador() {
                 <Button type="button" variant="outline" size="lg" className="flex-1" onClick={handlePrevStep}>
                   Voltar
                 </Button>
-                <Button type="submit" variant="secondary" size="lg" className="flex-1" disabled={!selfieFile}>
-                  Enviar Cadastro
+                <Button type="submit" variant="secondary" size="lg" className="flex-1" disabled={!selfieFile || isSubmitting}>
+                  {isSubmitting ? 'Enviando...' : 'Enviar Cadastro'}
                 </Button>
               </div>
             </form>
@@ -347,11 +447,14 @@ export default function CadastroPrestador() {
               </div>
 
               <div className="pt-4 flex flex-col sm:flex-row gap-3">
-                <Button variant="outline" className="flex-1" onClick={() => navigate('/')}>
+                <Button type="button" variant="outline" className="flex-1" onClick={() => navigate('/', { replace: true })}>
                   Voltar para o Início
                 </Button>
-                <Button variant="secondary" className="flex-1" onClick={() => navigate('/dashboard')}>
-                  Acessar Painel (Provisório)
+                <Button type="button" variant="secondary" className="flex-1" onClick={handleGoToProfileEdit}>
+                  Completar Perfil
+                </Button>
+                <Button type="button" variant="secondary" className="flex-1" onClick={handleGoToDashboard}>
+                  Acessar Painel
                 </Button>
               </div>
             </div>

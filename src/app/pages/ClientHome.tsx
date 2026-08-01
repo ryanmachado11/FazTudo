@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -10,8 +10,8 @@ import {
   Sparkles, Wind, Shield, Truck, Construction, Flame, Layers, Maximize2, Armchair, Tv, Wifi, Waves, 
   Bug, LayoutGrid, Paintbrush, Hammer, TreePine, ChevronLeft, ChevronRight, X, Filter, Flame as PopularIcon
 } from 'lucide-react';
-import { professionals } from '../lib/mockData';
 import { serviceCategories, ServiceCategory } from '../lib/categoriesData';
+import { apiGet } from '../lib/api';
 
 // Map iconName strings to Lucide Icon Components
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -43,11 +43,26 @@ const popularSearches = ['Pintor', 'Eletricista', 'Vazamento', 'Ar-Condicionado'
 
 export default function ClientHome() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<any | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [backendProviders, setBackendProviders] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    apiGet<any[]>('/api/providers').then((data) => {
+      if (data) {
+        setBackendProviders(data);
+      }
+    });
+    apiGet<any[]>('/api/categories').then((data) => {
+      if (data) {
+        setCategories(data);
+      }
+    });
+  }, []);
 
   const handleScroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
@@ -61,26 +76,40 @@ export default function ClientHome() {
     cat.subcategories.filter(sub => sub.toLowerCase().includes(searchTerm.toLowerCase()) && searchTerm.trim().length > 1)
   ).slice(0, 5);
 
-  // Filter professionals
-  const filteredProfessionals = professionals.filter((prof) => {
-    const term = searchTerm.toLowerCase();
-    const matchesSearch = !searchTerm || 
-                          prof.name.toLowerCase().includes(term) ||
-                          prof.category.toLowerCase().includes(term) ||
-                          prof.specialties.some(s => s.toLowerCase().includes(term)) ||
-                          prof.description.toLowerCase().includes(term);
+  // Find static category match to get subcategories if selected
+  const matchedSelectedStatic = selectedCategory
+    ? serviceCategories.find(
+        (sc) =>
+          sc.name.toLowerCase() === selectedCategory.name.toLowerCase() ||
+          sc.id === selectedCategory.slug
+      )
+    : null;
+  const subcategoriesList = matchedSelectedStatic?.subcategories ?? [];
 
-    const matchesCategory = !selectedCategory || 
-                            prof.category.toLowerCase().includes(selectedCategory.name.toLowerCase()) ||
-                            selectedCategory.name.toLowerCase().includes(prof.category.toLowerCase()) ||
-                            selectedCategory.subcategories.some(sub => 
-                              prof.category.toLowerCase().includes(sub.toLowerCase()) ||
-                              prof.specialties.some(s => s.toLowerCase().includes(sub.toLowerCase()))
+  const filteredProfessionals = backendProviders.filter((prof: any) => {
+    const term = searchTerm.toLowerCase();
+    const name = prof.name ?? '';
+    const category = prof.category ?? '';
+    const specialties = prof.specialties ?? [];
+    const description = prof.description ?? '';
+
+    const matchesSearch = !searchTerm ||
+                          name.toLowerCase().includes(term) ||
+                          category.toLowerCase().includes(term) ||
+                          specialties.some((s: string) => s.toLowerCase().includes(term)) ||
+                          description.toLowerCase().includes(term);
+
+    const matchesCategory = !selectedCategory ||
+                            category.toLowerCase().includes(selectedCategory.name.toLowerCase()) ||
+                            selectedCategory.name.toLowerCase().includes(category.toLowerCase()) ||
+                            subcategoriesList.some(sub => 
+                              category.toLowerCase().includes(sub.toLowerCase()) ||
+                              specialties.some((s: string) => s.toLowerCase().includes(sub.toLowerCase()))
                             );
 
     const matchesSubcategory = !selectedSubcategory ||
-                               prof.specialties.some(s => s.toLowerCase().includes(selectedSubcategory.toLowerCase())) ||
-                               prof.category.toLowerCase().includes(selectedSubcategory.toLowerCase());
+                               specialties.some((s: string) => s.toLowerCase().includes(selectedSubcategory.toLowerCase())) ||
+                               category.toLowerCase().includes(selectedSubcategory.toLowerCase());
 
     return matchesSearch && matchesCategory && matchesSubcategory;
   });
@@ -104,10 +133,18 @@ export default function ClientHome() {
               <span className="text-xl font-bold text-foreground">FazTudo+</span>
             </Link>
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" className="font-medium">
-                <MessageCircle className="h-5 w-5 mr-1.5" />
-                <span className="hidden sm:inline">Mensagens</span>
-              </Button>
+              <Link to="/servicos">
+                <Button variant="ghost" size="sm" className="font-medium">
+                  <span className="hidden sm:inline">Meus serviços</span>
+                  <span className="sm:hidden">Serviços</span>
+                </Button>
+              </Link>
+              <Link to="/mensagens">
+                <Button variant="ghost" size="sm" className="font-medium">
+                  <MessageCircle className="h-5 w-5 mr-1.5" />
+                  <span className="hidden sm:inline">Mensagens</span>
+                </Button>
+              </Link>
               <Avatar className="h-9 w-9 cursor-pointer border border-border">
                 <AvatarFallback className="bg-secondary text-secondary-foreground font-semibold">MC</AvatarFallback>
               </Avatar>
@@ -225,7 +262,7 @@ export default function ClientHome() {
               <Filter className="h-4 w-4 text-secondary" />
               <h2 className="text-base font-semibold text-foreground">Categorias de Serviços</h2>
               <Badge variant="outline" className="text-xs font-normal">
-                {serviceCategories.length} disponíveis
+                {categories.length || serviceCategories.length} disponíveis
               </Badge>
             </div>
 
@@ -286,9 +323,18 @@ export default function ClientHome() {
               </Button>
 
               {/* Dynamic Category Pills with Icons */}
-              {serviceCategories.map((cat) => {
-                const IconComp = iconMap[cat.iconName] || Wrench;
+              {(categories.length > 0 ? categories : serviceCategories.slice(0, 3)).map((cat) => {
+                const matchedStatic = serviceCategories.find(
+                  (sc) =>
+                    sc.name.toLowerCase() === cat.name.toLowerCase() ||
+                    sc.id === cat.slug ||
+                    (cat.slug && sc.id.includes(cat.slug))
+                );
+
+                const iconName = matchedStatic?.iconName || 'Wrench';
+                const IconComp = iconMap[iconName] || Wrench;
                 const isSelected = selectedCategory?.id === cat.id;
+                const subsCount = matchedStatic?.subcategories.length ?? 1;
 
                 return (
                   <Button
@@ -314,7 +360,7 @@ export default function ClientHome() {
                     <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
                       isSelected ? 'bg-secondary-foreground/20 text-secondary-foreground' : 'bg-muted text-muted-foreground'
                     }`}>
-                      {cat.subcategories.length}
+                      {subsCount}
                     </span>
                   </Button>
                 );
@@ -323,7 +369,7 @@ export default function ClientHome() {
           </div>
 
           {/* Subcategories Secondary Bar (Renders when a Main Category is Selected) */}
-          {selectedCategory && (
+          {selectedCategory && subcategoriesList.length > 0 && (
             <div className="bg-secondary/5 border border-secondary/20 rounded-xl p-3 animate-in fade-in slide-in-from-top-1 duration-200">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
@@ -353,7 +399,7 @@ export default function ClientHome() {
                 >
                   Todas de {selectedCategory.name}
                 </button>
-                {selectedCategory.subcategories.map((sub) => {
+                {subcategoriesList.map((sub) => {
                   const isSubSelected = selectedSubcategory === sub;
                   return (
                     <button
@@ -410,7 +456,7 @@ export default function ClientHome() {
                     <div className="flex-shrink-0">
                       <Avatar className="h-20 w-20 border-2 border-secondary/20">
                         <AvatarFallback className="bg-secondary/20 text-secondary text-lg font-bold">
-                          {prof.name.split(' ').map(n => n[0]).join('')}
+                          {prof.name.split(' ').map((n: string) => n[0]).join('')}
                         </AvatarFallback>
                       </Avatar>
                     </div>
@@ -447,7 +493,7 @@ export default function ClientHome() {
                       </div>
 
                       <div className="flex flex-wrap gap-1.5">
-                        {prof.specialties.map((spec, idx) => (
+                        {prof.specialties.map((spec: string, idx: number) => (
                           <Badge 
                             key={idx} 
                             variant="secondary" 

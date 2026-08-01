@@ -1,17 +1,84 @@
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Avatar, AvatarFallback } from '../components/ui/avatar';
 import { Star, MapPin, Clock, ShieldCheck, MessageCircle, Wrench, ChevronLeft, Calendar, Award, CheckCircle2 } from 'lucide-react';
 import { Separator } from '../components/ui/separator';
-
-import { professionals } from '../lib/mockData';
+import { apiGet, apiPost } from '../lib/api';
+import { toast } from 'sonner';
+import { getCurrentUser } from '../lib/session';
 
 export default function ProviderProfile() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const [provider, setProvider] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isBooking, setIsBooking] = useState(false);
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
+  const [description, setDescription] = useState('');
+  const [bookingError, setBookingError] = useState('');
+  const currentUser = getCurrentUser();
 
-  const provider = professionals.find((p) => p.id === Number(id));
+  const requireClientSession = () => {
+    if (currentUser?.role === 'CLIENT') {
+      return true;
+    }
+
+    if (currentUser?.role === 'PROVIDER') {
+      toast.error('Entre com uma conta de cliente para contratar ou conversar com prestadores.');
+      return false;
+    }
+
+    toast.error('Faça login para contratar ou conversar com este prestador.');
+    navigate(`/login?redirectTo=${encodeURIComponent(`/prestador/${id}`)}`);
+    return false;
+  };
+
+  const handleStartChat = () => {
+    if (requireClientSession()) {
+      navigate(`/chat/${provider.id}`);
+    }
+  };
+
+  const resolveCategoryId = async () => {
+    if (provider?.categoryId) {
+      return provider.categoryId;
+    }
+
+    const categories = await apiGet<any[]>('/api/categories');
+    const category = categories.find((entry) => entry.name === provider?.category);
+    return category?.id ?? categories[0]?.id;
+  };
+
+  useEffect(() => {
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+
+    const fetchProvider = async () => {
+      try {
+        const result = await apiGet<any>(`/api/providers/${id}`);
+        setProvider(result);
+      } catch {
+        setProvider(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProvider();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center text-muted-foreground">Carregando perfil do prestador...</div>
+      </div>
+    );
+  }
 
   if (!provider) {
     return (
@@ -80,7 +147,7 @@ export default function ProviderProfile() {
             <div className="flex-shrink-0 mx-auto sm:mx-0">
               <Avatar className="h-28 w-28">
                 <AvatarFallback className="bg-secondary/20 text-secondary text-2xl">
-                  {provider.name.split(' ').map(n => n[0]).join('')}
+                  {provider.name?.split(' ').map((n: string) => n[0]).join('')}
                 </AvatarFallback>
               </Avatar>
             </div>
@@ -115,17 +182,92 @@ export default function ProviderProfile() {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Link to={`/chat/${provider.id}`} className="flex-1">
-                  <Button size="lg" variant="secondary" className="w-full">
-                    <MessageCircle className="h-5 w-5" />
-                    Conversar
+              {isBooking ? (
+                <div className="space-y-3 w-full bg-muted/30 p-4 rounded-xl border border-border text-left">
+                  <h4 className="text-sm font-semibold text-foreground">Descreva o serviço para contratação:</h4>
+                  <textarea
+                    className="w-full min-h-[80px] p-3 rounded-lg border border-border bg-input-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-secondary"
+                    placeholder="Ex: Preciso instalar 3 tomadas na sala e reparar um disjuntor queimado."
+                    value={description}
+                    onChange={(e) => {
+                      setDescription(e.target.value);
+                      setBookingError('');
+                    }}
+                  />
+                  {bookingError && (
+                    <p className="text-sm font-medium text-destructive">{bookingError}</p>
+                  )}
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="secondary" className="flex-1" disabled={isSubmittingBooking} onClick={async () => {
+                      if (!description.trim()) {
+                        const message = 'Por favor, descreva o serviço desejado.';
+                        setBookingError(message);
+                        toast.error(message);
+                        return;
+                      }
+
+                      if (!requireClientSession()) {
+                        return;
+                      }
+                      
+                      try {
+                        setIsSubmittingBooking(true);
+                        setBookingError('');
+                        const categoryId = await resolveCategoryId();
+                        if (!categoryId) {
+                          throw new Error('Categoria do prestador não encontrada.');
+                        }
+
+                        const payload = {
+                          categoryId,
+                          providerId: provider.id,
+                          description: description.trim(),
+                        };
+                        
+                        const createdService = await apiPost<any>('/api/services', payload);
+                        await apiPost('/api/chat/rooms', { serviceRequestId: createdService.service.id });
+                        toast.success('Solicitação de serviço enviada com sucesso!');
+                        setIsBooking(false);
+                        setDescription('');
+                        
+                        navigate(`/chat/${createdService.service.id}`);
+                      } catch (error: any) {
+                        const message = error?.message || 'Falha ao contratar.';
+                        setBookingError(message);
+                        toast.error(message);
+                      } finally {
+                        setIsSubmittingBooking(false);
+                      }
+                    }}>
+                      {isSubmittingBooking ? 'Enviando...' : 'Confirmar Contratação'}
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1" onClick={() => { setIsBooking(false); setDescription(''); }}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex-1">
+                    <Button size="lg" variant="secondary" className="w-full" onClick={handleStartChat}>
+                      <MessageCircle className="h-5 w-5" />
+                      Conversar
+                    </Button>
+                  </div>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      if (requireClientSession()) {
+                        setIsBooking(true);
+                      }
+                    }}
+                  >
+                    Contratar Agora
                   </Button>
-                </Link>
-                <Button size="lg" variant="outline" className="flex-1">
-                  Contratar Agora
-                </Button>
-              </div>
+                </div>
+              )}
             </div>
           </div>
         </Card>
@@ -143,7 +285,7 @@ export default function ProviderProfile() {
             <Card className="p-6">
               <h2 className="text-xl font-semibold mb-4">Especializações</h2>
               <div className="flex flex-wrap gap-2">
-                {provider.specialties.map((spec, idx) => (
+                {(provider.specialties || []).map((spec: string, idx: number) => (
                   <Badge key={idx} className="bg-secondary/10 text-secondary border-secondary/20">
                     <CheckCircle2 className="h-3 w-3 mr-1" />
                     {spec}

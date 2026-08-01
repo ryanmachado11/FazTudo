@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -6,14 +6,37 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Separator } from '../components/ui/separator';
 import { Wrench } from 'lucide-react';
+import { toast } from 'sonner';
+import { apiPost } from '../lib/api';
+import { saveSession } from '../lib/session';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login:', { email, password });
+    setIsSubmitting(true);
+
+    try {
+      const data = await apiPost('/api/auth/login', {
+        email,
+        password,
+      });
+
+      saveSession(data as { accessToken: string; refreshToken: string; user: any });
+      toast.success('Login realizado com sucesso!');
+      const params = new URLSearchParams(location.search);
+      const redirectTo = params.get('redirectTo');
+      navigate(redirectTo || ((data as any).user?.role === 'PROVIDER' ? '/dashboard' : '/home'));
+    } catch (error: any) {
+      toast.error(error?.message || 'Falha ao entrar.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -63,8 +86,8 @@ export default function Login() {
               />
             </div>
 
-            <Button type="submit" variant="secondary" size="lg" className="w-full">
-              Entrar
+            <Button type="submit" variant="secondary" size="lg" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? 'Entrando...' : 'Entrar'}
             </Button>
           </form>
 

@@ -8,6 +8,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Alert, AlertTitle, AlertDescription } from '../components/ui/alert';
 import { ChevronLeft, Wrench, AlertTriangle, MapPin, Search, CheckCircle, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiGet, apiPost } from '../lib/api';
 
 export default function Urgente() {
   const navigate = useNavigate();
@@ -17,8 +18,9 @@ export default function Urgente() {
   const [address, setAddress] = useState('Av. Paulista, 1000 - Bela Vista, São Paulo - SP');
   const [isSearching, setIsSearching] = useState(false);
   const [searchComplete, setSearchComplete] = useState(false);
+  const [foundProvider, setFoundProvider] = useState<any>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!description.trim() || !address.trim()) {
       toast.error('Preencha todos os campos para continuar.');
@@ -27,12 +29,49 @@ export default function Urgente() {
 
     setIsSearching(true);
     
-    // Simulate searching for 3 seconds
-    setTimeout(() => {
+    try {
+      // 1. Fetch categories to find target categoryId
+      const categories = await apiGet<any[]>('/api/categories');
+      const slugMap: Record<string, string> = {
+        vazamento: 'encanador',
+        energia: 'eletricista',
+        chaveiro: 'montador-de-moveis',
+      };
+      const targetSlug = slugMap[urgencyType] || 'eletricista';
+      const category = categories.find(c => c.slug === targetSlug) || categories[0];
+
+      if (!category) {
+        throw new Error('Nenhuma categoria de emergência correspondente foi encontrada.');
+      }
+
+      // 2. Fetch providers in this category
+      const providers = await apiGet<any[]>(`/api/providers?category=${category.slug}`);
+      const selectedProvider = providers.find(p => p.isUrgentAvailable) || providers[0];
+
+      if (!selectedProvider) {
+        throw new Error('Nenhum profissional disponível para essa especialidade no momento.');
+      }
+
+      // 3. Create service request
+      await apiPost('/api/services', {
+        categoryId: category.id,
+        providerId: selectedProvider.id,
+        description: `ATENDIMENTO DE EMERGÊNCIA: ${description.trim()} | Local: ${address.trim()}`,
+        urgencyFlag: true,
+      });
+
+      setFoundProvider(selectedProvider);
+
+      setTimeout(() => {
+        setIsSearching(false);
+        setSearchComplete(true);
+        toast.success('Profissional de emergência encontrado!');
+      }, 2500);
+
+    } catch (error: any) {
       setIsSearching(false);
-      setSearchComplete(true);
-      toast.success('Profissional de emergência encontrado!');
-    }, 3000);
+      toast.error(error?.message || 'Falha ao acionar profissional.');
+    }
   };
 
   const emergencyOptions = [
@@ -173,20 +212,20 @@ export default function Urgente() {
               <div className="space-y-2">
                 <h2 className="text-2xl font-bold text-foreground">Profissional Encontrado!</h2>
                 <p className="text-muted-foreground text-sm max-w-sm mx-auto leading-relaxed">
-                  **Carlos Silva (Eletricista)** aceitou o seu chamado e está a caminho de sua residência.
+                  **{foundProvider?.name} ({foundProvider?.category})** aceitou o seu chamado e está a caminho de sua residência.
                 </p>
               </div>
 
               <div className="max-w-md mx-auto bg-muted/40 p-4 rounded-xl border border-border text-left space-y-3">
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-sm font-bold text-foreground">Carlos Silva</p>
-                    <p className="text-xs text-muted-foreground">Eletricista - ⭐ 4.9 (127 avaliações)</p>
+                    <p className="text-sm font-bold text-foreground">{foundProvider?.name}</p>
+                    <p className="text-xs text-muted-foreground">{foundProvider?.category} - ⭐ {foundProvider?.rating} ({foundProvider?.reviews} avaliações)</p>
                   </div>
                   <Badge className="bg-success/15 text-success border-success/20">A caminho</Badge>
                 </div>
                 <div className="text-xs space-y-1 border-t border-border pt-3 text-muted-foreground">
-                  <p><strong>Tempo estimado de chegada:</strong> 12 minutos</p>
+                  <p><strong>Tempo estimado de chegada:</strong> 15 minutos</p>
                   <p><strong>Taxa fixa de atendimento:</strong> R$ 50,00 + serviço a combinar</p>
                 </div>
               </div>
@@ -195,9 +234,9 @@ export default function Urgente() {
                 <Button variant="outline" className="flex-1" onClick={() => navigate('/home')}>
                   Ir para a Home
                 </Button>
-                <Link to="/chat/1" className="flex-1">
+                <Link to={`/chat/${foundProvider?.id}`} className="flex-1">
                   <Button variant="secondary" className="w-full">
-                    Abrir Chat com Carlos
+                    Abrir Chat com {foundProvider?.name?.split(' ')[0]}
                   </Button>
                 </Link>
               </div>
