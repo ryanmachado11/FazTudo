@@ -1,4 +1,4 @@
-FazTudo+
+                                                          FazTudo+
 
 Uma plataforma simples para conectar clientes a prestadores de serviços da sua região.
 
@@ -6,13 +6,13 @@ O FazTudo+ foi criado para facilitar a contratação de profissionais como eletr
 
 Na plataforma, o cliente poderá encontrar prestadores por categoria e localização, consultar informações do perfil, verificar avaliações e iniciar o contato pelo WhatsApp. Já o prestador terá um painel próprio para acompanhar clientes, serviços e dados financeiros.
 
-*Objetivo
+*Objetivo:
 
 Centralizar a busca por prestadores de serviços em um ambiente simples, organizado e confiável, ajudando clientes a encontrar profissionais e permitindo que os prestadores gerenciem melhor o próprio trabalho.
 
 *Funcionalidades do FazTudo+
 
--Para clientes
+-Para clientes:
 
 Cadastro e acesso à plataforma;
 
@@ -24,7 +24,7 @@ Contato direto com o prestador pelo WhatsApp;
 
 Avaliação do profissional após a realização do serviço.
 
--Para prestadores
+-Para prestadores:
 
 Cadastro de perfil profissional;
 
@@ -38,7 +38,7 @@ Visão geral de receitas e informações financeiras;
 
 Histórico e média das avaliações recebidas.
 
-*Como funciona
+*Como funciona:
 
 1.O cliente pesquisa o serviço de que precisa.
 
@@ -50,7 +50,7 @@ Histórico e média das avaliações recebidas.
 
 5.Depois do serviço, o cliente pode avaliar o prestador.
 
-*Equipe
+*Equipe:
 
 Projeto desenvolvido pela equipe 3405 :
 
