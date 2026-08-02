@@ -40,12 +40,26 @@ Histórico e média das avaliações recebidas.
 
 Como funciona
 
-O cliente pesquisa o serviço de que precisa.
+1.O cliente pesquisa o serviço de que precisa.
 
-A plataforma apresenta profissionais disponíveis na região.
+2.A plataforma apresenta profissionais disponíveis na região.
 
-O cliente analisa os perfis e as avaliações.
+3.O cliente analisa os perfis e as avaliações.
 
-O contato e a negociação são feitos diretamente pelo WhatsApp.
+4.O contato e a negociação são feitos diretamente pelo WhatsApp.
+
+5.Depois do serviço, o cliente pode avaliar o prestador.
+
+Equipe
+
+Projeto desenvolvido pela equipe 3405 :
+
+-João Lucas Dionísio;
+
+-Ryan;
+
+-Erick;
+
+-Gustavo.
 
 Depois do serviço, o cliente pode avaliar o prestador.
