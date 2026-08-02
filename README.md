@@ -3,7 +3,7 @@ Uma plataforma simples para conectar clientes a assuntos de serviços de sua reg
 
 O FazTudo+ foi criado para facilitar a contratação de profissionais como eletricistas, encanadores, pedreiros e pintores. A proposta é oferecer uma experiência direta e acessível, inclusive para pessoas com pouca familiaridade com tecnologia.
 
-Na plataforma, o cliente poderá encontrar informações por categoria e localização, consultar informações do perfil, verificar avaliações e iniciar o contato pelo WhatsApp. Já o prestador terá um painel próprio para acompanhar clientes, serviços e dados financeiros.
+Na plataforma, o cliente poderá encontrar informações por categoria, consultar informações do perfil, verificar avaliações e iniciar a conversa através do chat interno. Já o prestador terá um painel próprio para acompanhar clientes, serviços e dados financeiros.
 
 *Objetivo:
 
