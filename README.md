@@ -62,4 +62,3 @@ Projeto desenvolvido pela equipe 3405 :
 
 -Gustavo.
 
-Depois do serviço, o cliente pode avaliar o prestador.
