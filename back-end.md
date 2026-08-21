@@ -101,7 +101,7 @@ Implemente os endpoints seguindo o padrão REST:
 ### Auth & Perfil
 * `POST /api/auth/register` — Cadastro de usuário (Validação estrita de e-mail e CPF brasileiro).
 * `POST /api/auth/login` — Autenticação com retorno de JWT e Cookies Seguros.
-* `POST /api/auth/verification` — Upload de documentos e selfie para o processo de verificação de conta (Privativo para Prestadores).
+* `POST /api/provider/profile/me` — Criação e atualização do perfil do prestador.
 
 ### Cliente & Busca (Home / Perfil Prestador)
 * `GET /api/categories` — Listagem do escopo do MVP.

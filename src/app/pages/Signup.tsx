@@ -7,7 +7,7 @@ import { Label } from '../components/ui/label';
 import { Separator } from '../components/ui/separator';
 import { Wrench } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiPost } from '../lib/api';
+import { ApiError, apiPost } from '../lib/api';
 
 export default function Signup() {
   const [name, setName] = useState('');
@@ -15,11 +15,25 @@ export default function Signup() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+  const [formError, setFormError] = useState('');
   const navigate = useNavigate();
+
+  const getFieldError = (field: string) => fieldErrors[field]?.[0];
+  const clearFieldError = (field: string) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setFieldErrors({});
+    setFormError('');
 
     try {
       await apiPost('/api/auth/register', {
@@ -33,6 +47,13 @@ export default function Signup() {
       toast.success('Cadastro realizado com sucesso! Faça login para continuar.');
       navigate('/login');
     } catch (error: any) {
+      if (error instanceof ApiError && error.payload?.issues?.fieldErrors) {
+        setFieldErrors(error.payload.issues.fieldErrors);
+        setFormError(error.message);
+        toast.error(error.message);
+        return;
+      }
+
       toast.error(error?.message || 'Falha ao cadastrar.');
     } finally {
       setIsSubmitting(false);
@@ -42,7 +63,6 @@ export default function Signup() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <Link to="/" className="flex items-center justify-center gap-2 mb-8">
           <Wrench className="h-10 w-10 text-secondary" />
           <span className="text-3xl font-bold text-foreground">FazTudo+</span>
@@ -54,6 +74,12 @@ export default function Signup() {
             <p className="text-muted-foreground">Cadastre-se para contratar profissionais</p>
           </div>
 
+          {formError && (
+            <div className="mb-4 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              {formError}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Nome completo</Label>
@@ -62,10 +88,15 @@ export default function Signup() {
                 type="text"
                 placeholder="Seu nome completo"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  clearFieldError('name');
+                }}
                 required
                 className="bg-input-background"
+                aria-invalid={Boolean(getFieldError('name'))}
               />
+              {getFieldError('name') && <p className="text-xs text-destructive">{getFieldError('name')}</p>}
             </div>
 
             <div className="space-y-2">
@@ -75,10 +106,15 @@ export default function Signup() {
                 type="email"
                 placeholder="seu@email.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  clearFieldError('email');
+                }}
                 required
                 className="bg-input-background"
+                aria-invalid={Boolean(getFieldError('email'))}
               />
+              {getFieldError('email') && <p className="text-xs text-destructive">{getFieldError('email')}</p>}
             </div>
 
             <div className="space-y-2">
@@ -88,10 +124,15 @@ export default function Signup() {
                 type="tel"
                 placeholder="(11) 99999-9999"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  clearFieldError('phone');
+                }}
                 required
                 className="bg-input-background"
+                aria-invalid={Boolean(getFieldError('phone'))}
               />
+              {getFieldError('phone') && <p className="text-xs text-destructive">{getFieldError('phone')}</p>}
             </div>
 
             <div className="space-y-2">
@@ -101,11 +142,18 @@ export default function Signup() {
                 type="password"
                 placeholder="Mínimo 8 caracteres"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  clearFieldError('password');
+                }}
                 required
                 minLength={8}
                 className="bg-input-background"
+                aria-invalid={Boolean(getFieldError('password'))}
               />
+              {getFieldError('password') && (
+                <p className="text-xs text-destructive">{getFieldError('password')}</p>
+              )}
             </div>
 
             <Button type="submit" variant="secondary" size="lg" className="w-full" disabled={isSubmitting}>

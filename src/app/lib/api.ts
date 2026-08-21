@@ -1,6 +1,28 @@
 import { getAccessToken } from './session';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3001';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
+export type ApiFieldErrors = Record<string, string[]>;
+
+export type ApiErrorPayload = {
+  error?: string;
+  issues?: {
+    fieldErrors?: ApiFieldErrors;
+    formErrors?: string[];
+  };
+};
+
+export class ApiError extends Error {
+  status: number;
+  payload: ApiErrorPayload | null;
+
+  constructor(message: string, status: number, payload: ApiErrorPayload | null) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.payload = payload;
+  }
+}
 
 function getAuthHeaders(): Record<string, string> {
   const accessToken = getAccessToken();
@@ -15,15 +37,33 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...(options.headers as Record<string, string> | undefined),
   };
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch {
+    throw new ApiError(
+      'Não foi possível conectar ao servidor. Verifique se a API está rodando e tente novamente.',
+      0,
+      null,
+    );
+  }
 
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
+    if (!payload && response.status >= 500) {
+      throw new ApiError(
+        'Não foi possível conectar ao servidor. Verifique se a API está rodando e tente novamente.',
+        response.status,
+        null,
+      );
+    }
+
     const message = payload?.error || response.statusText;
-    throw new Error(message);
+    throw new ApiError(message, response.status, payload);
   }
 
   return (await response.json()) as T;

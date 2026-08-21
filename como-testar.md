@@ -7,7 +7,7 @@ cd backend -> docker compose up
 
 deve funcionar.
 
-usa esses usuários pra testar as funções do prestador, pq eles ja vem verificados para interagir com os cliente. Prestador sem verificação não consegue falar com ngm.
+usa esses usuários pra testar as funções do prestador, pq eles ja vêm com perfil pronto para interagir com os cliente. Prestador sem cadastro de perfil ainda não consegue falar com ngm.
 
 carlos@example.com
 roberto@example.com

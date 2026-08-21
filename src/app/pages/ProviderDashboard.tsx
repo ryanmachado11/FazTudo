@@ -150,12 +150,9 @@ export default function ProviderDashboard() {
   const averageRating = dashboard?.provider?.averageRating ?? 0;
   const totalReviews = dashboard?.provider?.totalReviews ?? 0;
   const providerVerified = dashboard?.provider?.verified ?? profile?.isVerified ?? false;
-  const verificationStatus = dashboard?.verification?.status ?? 'NONE';
   const profileReady = dashboard?.setup?.profileReady ?? Boolean(profile);
   const needsOnboarding = !profileReady;
-  const isPendingVerification = verificationStatus === 'PENDING';
-  const isRejectedVerification = verificationStatus === 'REJECTED';
-  const shouldShowSetupBanner = needsOnboarding || verificationStatus !== 'APPROVED';
+  const shouldShowSetupBanner = needsOnboarding;
 
   const requests = dashboard?.requests ?? [];
   const pendingRequests = requests.filter((request) => request.status === 'REQUESTED');
@@ -309,27 +306,17 @@ export default function ProviderDashboard() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-5 w-5 text-secondary" />
-                  <h2 className="text-lg font-semibold text-foreground">
-                    {isRejectedVerification
-                      ? 'Verificação precisa de revisão'
-                      : isPendingVerification
-                        ? 'Verificação em análise'
-                        : 'Finalize seu cadastro de prestador'}
-                  </h2>
+                  <h2 className="text-lg font-semibold text-foreground">Finalize seu cadastro de prestador</h2>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {isRejectedVerification
-                    ? dashboard?.verification?.rejectionReason || 'Houve uma inconsistência na verificação. Envie os documentos novamente.'
-                    : isPendingVerification
-                      ? 'Recebemos seus documentos e a foto de verificação. O painel vai liberar todos os dados assim que a análise for concluída.'
-                      : 'Envie seus documentos de verificação para criar o perfil do prestador no banco de dados e liberar o painel.'}
+                  Complete os dados do perfil para liberar seu painel e receber solicitações.
                 </p>
               </div>
 
               <div className="flex gap-3">
                 <Link to={profileReady ? '/perfil/editar' : '/cadastro-prestador'}>
                   <Button variant="secondary">
-                    {profileReady ? 'Completar perfil' : 'Enviar documentos'}
+                    {profileReady ? 'Completar perfil' : 'Completar cadastro'}
                   </Button>
                 </Link>
               </div>
