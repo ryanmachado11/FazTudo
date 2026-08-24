@@ -10,8 +10,10 @@ done
 echo "Running Prisma migrations..."
 npx prisma migrate deploy
 
-echo "Seeding database..."
-npm run seed
+if [ "${SEED_ON_START:-false}" = "true" ]; then
+  echo "Seeding database..."
+  npm run seed
+fi
 
 echo "Starting FazTudo API..."
 exec npm run start

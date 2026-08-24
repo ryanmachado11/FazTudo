@@ -8,35 +8,52 @@ export async function dashboardRoutes(app: FastifyInstance) {
     if (!user) {
       return reply.code(401).send({ error: 'Unauthorized' });
     }
+    if (user.role !== 'PROVIDER') {
+      return reply.code(403).send({ error: 'Only providers can access this route' });
+    }
 
-    const profile = await prisma.providerProfile.findUnique({
-      where: { userId: user.sub },
-      include: { categories: { include: { category: true } } },
-    });
-    const latestVerification = await prisma.userVerification.findFirst({
-      where: { userId: user.sub },
-      orderBy: { createdAt: 'desc' },
-    });
-    const requests = await prisma.serviceRequest.findMany({
-      where: { providerId: user.sub, status: { in: ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'] } },
-      include: { client: true, category: true },
-      orderBy: { createdAt: 'desc' },
-    });
-    const completedThisMonth = await prisma.serviceRequest.count({
-      where: {
-        providerId: user.sub,
-        status: 'COMPLETED',
-        updatedAt: {
-          gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    const [profile, latestVerification, requests, completedThisMonth, reviews] = await Promise.all([
+      prisma.providerProfile.findUnique({
+        where: { userId: user.sub },
+        include: { categories: { include: { category: true } } },
+      }),
+      prisma.userVerification.findFirst({
+        where: { userId: user.sub },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.serviceRequest.findMany({
+        where: { providerId: user.sub, status: { in: ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'] } },
+        select: {
+          id: true,
+          clientId: true,
+          description: true,
+          status: true,
+          scheduledFor: true,
+          client: { select: { name: true } },
         },
-      },
-    });
-    const reviews = await prisma.review.findMany({
-      where: { providerId: user.sub },
-      include: { client: true },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    });
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+      prisma.serviceRequest.count({
+        where: {
+          providerId: user.sub,
+          status: 'COMPLETED',
+          updatedAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
+        },
+      }),
+      prisma.review.findMany({
+        where: { providerId: user.sub, status: 'APPROVED' },
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+          client: { select: { name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      }),
+    ]);
 
     return {
       verification: latestVerification

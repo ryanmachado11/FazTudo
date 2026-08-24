@@ -55,28 +55,34 @@ export default function Messages() {
     }
 
     let isMounted = true;
+    let timeoutId: number | undefined;
+    let hasReportedError = false;
 
     const loadRooms = async () => {
       try {
         const data = await apiGet<ChatRoomItem[]>('/api/chat/rooms');
         if (isMounted) {
           setRooms(data);
+          hasReportedError = false;
         }
       } catch (error: any) {
-        toast.error(error?.message || 'Não foi possível carregar suas mensagens.');
+        if (!hasReportedError) {
+          toast.error(error?.message || 'Não foi possível carregar suas mensagens.');
+          hasReportedError = true;
+        }
       } finally {
         if (isMounted) {
           setLoading(false);
+          timeoutId = window.setTimeout(loadRooms, 5000);
         }
       }
     };
 
     loadRooms();
-    const intervalId = window.setInterval(loadRooms, 5000);
 
     return () => {
       isMounted = false;
-      window.clearInterval(intervalId);
+      if (timeoutId) window.clearTimeout(timeoutId);
     };
   }, [currentUser?.id, currentUser?.role, navigate]);
 
@@ -126,7 +132,7 @@ export default function Messages() {
                   : room.providerName || 'Prestador';
               const chatTargetId = currentUser?.role === 'PROVIDER' ? room.clientId : room.providerId;
               const chatPath = room.serviceRequestId
-                ? `/chat/${room.serviceRequestId}`
+                ? `/chat/servico/${room.serviceRequestId}`
                 : chatTargetId
                   ? `/chat/${chatTargetId}`
                   : null;

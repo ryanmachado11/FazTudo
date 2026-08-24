@@ -85,7 +85,6 @@ export default function CadastroPrestador() {
 
       saveSession({
         accessToken: loginRes.accessToken,
-        refreshToken: loginRes.refreshToken,
         user: loginRes.user,
       });
 
@@ -100,6 +99,7 @@ export default function CadastroPrestador() {
 
       await apiPut('/api/provider/profile/me', {
         bio: `Profissional especializado em ${subcategory}. Experiencia: ${experience}.`,
+        specialties: [subcategory],
         city: 'Sao Paulo',
         neighborhood: '',
         state: 'SP',
@@ -168,7 +168,7 @@ export default function CadastroPrestador() {
               <div>
                 <h1 className="text-2xl font-bold text-foreground mb-2">Seja um prestador FazTudo+</h1>
                 <p className="text-muted-foreground text-sm">
-                  Crie sua conta e comece a receber trabalhos sem envio de imagem ou verificacao manual.
+                  Crie sua conta e complete o perfil para iniciar o processo de verificação.
                 </p>
               </div>
 
@@ -311,7 +311,7 @@ export default function CadastroPrestador() {
               <div>
                 <h1 className="text-2xl font-bold text-foreground mb-2">Revise seu cadastro</h1>
                 <p className="text-muted-foreground text-sm">
-                  Seu perfil sera criado direto, sem documento ou selfie.
+                  Seu perfil será criado como pendente até a verificação da plataforma.
                 </p>
               </div>
 
@@ -360,11 +360,11 @@ export default function CadastroPrestador() {
 
               <div className="space-y-2">
                 <Badge className="bg-secondary/15 text-secondary border-secondary/20 text-sm py-1 px-3">
-                  Perfil ativo
+                  Aguardando verificação
                 </Badge>
                 <h1 className="text-2xl font-bold text-foreground">Cadastro concluido</h1>
                 <p className="text-muted-foreground text-sm max-w-sm mx-auto">
-                  Sua conta de prestador foi criada e o perfil ja esta pronto para receber solicitacoes.
+                  Sua conta de prestador foi criada. Complete o perfil e aguarde a verificação para receber solicitações.
                 </p>
               </div>
 

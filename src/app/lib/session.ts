@@ -1,6 +1,5 @@
-type SessionData = {
+export type SessionData = {
   accessToken: string;
-  refreshToken: string;
   user: {
     id: string;
     name: string;
@@ -11,16 +10,31 @@ type SessionData = {
 
 const SESSION_KEY = 'faztudo_session';
 
+function storage(): Storage | null {
+  return typeof window === 'undefined' ? null : window.sessionStorage;
+}
+
 export function saveSession(data: SessionData) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(data));
+  storage()?.setItem(SESSION_KEY, JSON.stringify(data));
+  // Remove sessions created by older builds, where credentials persisted after
+  // the browser was closed.
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(SESSION_KEY);
+  }
 }
 
 export function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
+  storage()?.removeItem(SESSION_KEY);
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(SESSION_KEY);
+  }
 }
 
 export function getSession(): SessionData | null {
-  const json = localStorage.getItem(SESSION_KEY);
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(SESSION_KEY);
+  }
+  const json = storage()?.getItem(SESSION_KEY);
   if (!json) return null;
 
   try {
@@ -32,10 +46,6 @@ export function getSession(): SessionData | null {
 
 export function getAccessToken(): string | null {
   return getSession()?.accessToken ?? null;
-}
-
-export function getRefreshToken(): string | null {
-  return getSession()?.refreshToken ?? null;
 }
 
 export function getCurrentUser() {

@@ -3,7 +3,7 @@ import { verifyAccessToken } from '../lib/auth.js';
 
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
   const header = request.headers.authorization;
-  if (!header || !header.startsWith('Bearer ')) {
+  if (!header || !/^Bearer [^\s]+$/.test(header)) {
     reply.code(401).send({ error: 'Unauthorized' });
     return;
   }
@@ -22,7 +22,6 @@ declare module 'fastify' {
     user?: {
       sub: string;
       role: string;
-      email: string;
     };
   }
 }

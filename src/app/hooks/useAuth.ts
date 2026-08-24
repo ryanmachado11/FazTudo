@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getCurrentUser, isLoggedIn, saveSession, clearSession } from '../lib/session';
+import { getCurrentUser, getSession, isLoggedIn, saveSession, clearSession } from '../lib/session';
 import { apiGet } from '../lib/api';
 
 type AuthUser = {
@@ -21,12 +21,15 @@ export function useAuth() {
       }
 
       try {
-        const sessionUser = getCurrentUser();
+        const session = getSession();
+        if (!session) {
+          setUser(null);
+          return;
+        }
         const profile = await apiGet<{ id: string; name: string; email: string; role: string }>('/api/auth/me');
-        const merged = { ...sessionUser, ...profile } as AuthUser;
+        const merged = { ...session.user, ...profile } as AuthUser;
         saveSession({
-          accessToken: localStorage.getItem('faztudo_session') ? JSON.parse(localStorage.getItem('faztudo_session') || '{}').accessToken : '',
-          refreshToken: localStorage.getItem('faztudo_session') ? JSON.parse(localStorage.getItem('faztudo_session') || '{}').refreshToken : '',
+          accessToken: session.accessToken,
           user: merged,
         });
         setUser(merged);

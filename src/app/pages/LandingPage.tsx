@@ -11,11 +11,11 @@ export default function LandingPage() {
   const [categories, setCategories] = useState<any[]>([]);
 
   useEffect(() => {
-    apiGet<any[]>('/api/categories').then((data) => {
-      if (data) {
-        setCategories(data);
-      }
-    });
+    let isMounted = true;
+    apiGet<any[]>('/api/categories')
+      .then((data) => { if (isMounted) setCategories(data); })
+      .catch(() => { /* Static fallback categories remain visible. */ });
+    return () => { isMounted = false; };
   }, []);
   return (
     <div className="min-h-screen bg-background">

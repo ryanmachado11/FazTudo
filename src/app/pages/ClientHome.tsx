@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -52,16 +52,13 @@ export default function ClientHome() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    apiGet<any[]>('/api/providers').then((data) => {
-      if (data) {
-        setBackendProviders(data);
-      }
+    let isMounted = true;
+    Promise.allSettled([apiGet<any[]>('/api/providers'), apiGet<any[]>('/api/categories')]).then((results) => {
+      if (!isMounted) return;
+      if (results[0].status === 'fulfilled') setBackendProviders(results[0].value);
+      if (results[1].status === 'fulfilled') setCategories(results[1].value);
     });
-    apiGet<any[]>('/api/categories').then((data) => {
-      if (data) {
-        setCategories(data);
-      }
-    });
+    return () => { isMounted = false; };
   }, []);
 
   const handleScroll = (direction: 'left' | 'right') => {
@@ -72,9 +69,9 @@ export default function ClientHome() {
   };
 
   // Find subcategory suggestions matching current search query
-  const matchingSubcategories = serviceCategories.flatMap(cat => 
+  const matchingSubcategories = useMemo(() => serviceCategories.flatMap(cat =>
     cat.subcategories.filter(sub => sub.toLowerCase().includes(searchTerm.toLowerCase()) && searchTerm.trim().length > 1)
-  ).slice(0, 5);
+  ).slice(0, 5), [searchTerm]);
 
   // Find static category match to get subcategories if selected
   const matchedSelectedStatic = selectedCategory
@@ -86,7 +83,7 @@ export default function ClientHome() {
     : null;
   const subcategoriesList = matchedSelectedStatic?.subcategories ?? [];
 
-  const filteredProfessionals = backendProviders.filter((prof: any) => {
+  const filteredProfessionals = useMemo(() => backendProviders.filter((prof: any) => {
     const term = searchTerm.toLowerCase();
     const name = prof.name ?? '';
     const category = prof.category ?? '';
@@ -112,7 +109,7 @@ export default function ClientHome() {
                                category.toLowerCase().includes(selectedSubcategory.toLowerCase());
 
     return matchesSearch && matchesCategory && matchesSubcategory;
-  });
+  }), [backendProviders, searchTerm, selectedCategory, selectedSubcategory, subcategoriesList]);
 
   const clearAllFilters = () => {
     setSearchTerm('');

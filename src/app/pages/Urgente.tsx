@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
 import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -19,6 +20,7 @@ export default function Urgente() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchComplete, setSearchComplete] = useState(false);
   const [foundProvider, setFoundProvider] = useState<any>(null);
+  const [serviceRequestId, setServiceRequestId] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,25 +37,25 @@ export default function Urgente() {
       const slugMap: Record<string, string> = {
         vazamento: 'encanador',
         energia: 'eletricista',
-        chaveiro: 'montador-de-moveis',
+        chaveiro: 'chaveiro',
       };
       const targetSlug = slugMap[urgencyType] || 'eletricista';
-      const category = categories.find(c => c.slug === targetSlug) || categories[0];
+      const category = categories.find(c => c.slug === targetSlug);
 
       if (!category) {
         throw new Error('Nenhuma categoria de emergência correspondente foi encontrada.');
       }
 
       // 2. Fetch providers in this category
-      const providers = await apiGet<any[]>(`/api/providers?category=${category.slug}`);
-      const selectedProvider = providers.find(p => p.isUrgentAvailable) || providers[0];
+      const providers = await apiGet<any[]>(`/api/providers?category=${encodeURIComponent(category.slug)}&urgent=true`);
+      const selectedProvider = providers[0];
 
       if (!selectedProvider) {
         throw new Error('Nenhum profissional disponível para essa especialidade no momento.');
       }
 
       // 3. Create service request
-      await apiPost('/api/services', {
+      const created = await apiPost<{ service: { id: string } }>('/api/services', {
         categoryId: category.id,
         providerId: selectedProvider.id,
         description: `ATENDIMENTO DE EMERGÊNCIA: ${description.trim()} | Local: ${address.trim()}`,
@@ -61,12 +63,10 @@ export default function Urgente() {
       });
 
       setFoundProvider(selectedProvider);
-
-      setTimeout(() => {
-        setIsSearching(false);
-        setSearchComplete(true);
-        toast.success('Profissional de emergência encontrado!');
-      }, 2500);
+      setServiceRequestId(created.service.id);
+      setIsSearching(false);
+      setSearchComplete(true);
+      toast.success('Profissional de emergência encontrado!');
 
     } catch (error: any) {
       setIsSearching(false);
@@ -151,6 +151,7 @@ export default function Urgente() {
                     placeholder="Ex: Cano de entrada da cozinha estourou e está vazando muita água. Preciso fechar/reparar urgente."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
+                    maxLength={4000}
                     required
                     className="bg-input-background"
                   />
@@ -165,6 +166,7 @@ export default function Urgente() {
                       id="address"
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
+                      maxLength={500}
                       required
                       className="pl-10 bg-input-background"
                     />
@@ -234,7 +236,7 @@ export default function Urgente() {
                 <Button variant="outline" className="flex-1" onClick={() => navigate('/home')}>
                   Ir para a Home
                 </Button>
-                <Link to={`/chat/${foundProvider?.id}`} className="flex-1">
+                <Link to={serviceRequestId ? `/chat/servico/${serviceRequestId}` : '/mensagens'} className="flex-1">
                   <Button variant="secondary" className="w-full">
                     Abrir Chat com {foundProvider?.name?.split(' ')[0]}
                   </Button>

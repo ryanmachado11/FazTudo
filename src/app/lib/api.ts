@@ -1,4 +1,4 @@
-import { getAccessToken } from './session';
+import { clearSession, getAccessToken } from './session';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -30,12 +30,21 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  if (!path.startsWith('/')) {
+    throw new ApiError('Caminho de API inválido.', 0, null);
+  }
+
   const url = `${API_BASE_URL}${path}`;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...getAuthHeaders(),
     ...(options.headers as Record<string, string> | undefined),
   };
+  if (options.body) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 15_000);
 
   let response: Response;
 
@@ -43,13 +52,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     response = await fetch(url, {
       ...options,
       headers,
+      credentials: 'omit',
+      signal: controller.signal,
     });
-  } catch {
+  } catch (error) {
     throw new ApiError(
-      'Não foi possível conectar ao servidor. Verifique se a API está rodando e tente novamente.',
+      error instanceof DOMException && error.name === 'AbortError'
+        ? 'A solicitação demorou demais. Tente novamente.'
+        : 'Não foi possível conectar ao servidor. Verifique se a API está rodando e tente novamente.',
       0,
       null,
     );
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 
   if (!response.ok) {
@@ -62,8 +77,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       );
     }
 
-    const message = payload?.error || response.statusText;
+    if (response.status === 401) {
+      clearSession();
+    }
+
+    const message = payload?.error || response.statusText || 'Falha na solicitação.';
     throw new ApiError(message, response.status, payload);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   return (await response.json()) as T;

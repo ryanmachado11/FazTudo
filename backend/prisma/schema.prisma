@@ -79,6 +79,7 @@ model UserVerification {
   updatedAt         DateTime            @updatedAt @map("updated_at")
   user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, createdAt])
   @@map("user_verifications")
 }
 
@@ -100,6 +101,7 @@ model ProviderProfile {
   id               String   @id @default(uuid()) @db.VarChar(36)
   userId           String   @unique @map("user_id") @db.VarChar(36)
   bio              String?  @db.Text
+  specialties      Json?
   city             String?  @db.VarChar(255)
   neighborhood     String?  @db.VarChar(255)
   state            String?  @db.VarChar(255)
@@ -145,6 +147,8 @@ model ServiceRequest {
   chatRoom       ChatRoom?
   reviews        Review[]
 
+  @@index([clientId, createdAt])
+  @@index([providerId, status, createdAt])
   @@map("service_requests")
 }
 
@@ -159,6 +163,8 @@ model ChatRoom {
   provider         User          @relation("ChatProvider", fields: [providerId], references: [id], onDelete: Cascade)
   messages         ChatMessage[]
 
+  @@index([clientId, createdAt])
+  @@index([providerId, createdAt])
   @@map("chat_rooms")
 }
 
@@ -173,6 +179,7 @@ model ChatMessage {
   room         ChatRoom    @relation(fields: [roomId], references: [id], onDelete: Cascade)
   sender       User        @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
 
+  @@index([roomId, createdAt])
   @@map("chat_messages")
 }
 
@@ -189,5 +196,8 @@ model Review {
   client           User          @relation("ReviewsGiven", fields: [clientId], references: [id], onDelete: Cascade)
   provider         User          @relation("ReviewsReceived", fields: [providerId], references: [id], onDelete: Cascade)
 
+  @@unique([serviceRequestId])
+  @@index([providerId, status, createdAt])
+  @@index([clientId, createdAt])
   @@map("reviews")
 }

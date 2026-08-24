@@ -7,52 +7,34 @@ services:
       - '3001:3001'
     environment:
       PORT: 3001
-      NODE_ENV: production
-      DATABASE_URL: mysql://root:password@mysql:3306/faztudo
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: change-me
-      JWT_REFRESH_SECRET: change-me-refresh
+      NODE_ENV: ${NODE_ENV:-development}
+      # Compatível com volumes locais criados pela configuração anterior.
+      # Em produção, sobrescreva DATABASE_URL com um usuário dedicado.
+      DATABASE_URL: ${DATABASE_URL:-mysql://root:password@mysql:3306/faztudo}
+      JWT_SECRET: ${JWT_SECRET:-faztudo-local-development-jwt-secret-2026-only}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      SEED_ON_START: ${SEED_ON_START:-true}
     depends_on:
       mysql:
         condition: service_healthy
-      redis:
-        condition: service_started
     restart: unless-stopped
     command: ["/bin/sh", "/app/docker/entrypoint.sh"]
 
   mysql:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-password}
       MYSQL_DATABASE: faztudo
+      MYSQL_USER: faztudo
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-faztudo-local-app-2026}
     volumes:
       - mysql-data:/var/lib/mysql
     command: --default-authentication-plugin=mysql_native_password
-    ports:
-      - '3306:3306'
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-ppassword"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -ufaztudo -p$$MYSQL_PASSWORD"]
       interval: 10s
       timeout: 5s
       retries: 10
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    expose:
-      - '6379'
-    restart: unless-stopped
-
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin:latest
-    environment:
-      PMA_HOST: mysql
-      PMA_PORT: 3306
-      MYSQL_ROOT_PASSWORD: password
-    ports:
-      - '8080:80'
-    depends_on:
-      - mysql
     restart: unless-stopped
 
 volumes:

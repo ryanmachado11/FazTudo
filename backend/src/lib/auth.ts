@@ -1,12 +1,25 @@
 import jwt from 'jsonwebtoken';
 import argon2 from 'argon2';
-import { randomUUID } from 'crypto';
 
 export type JwtPayload = {
   sub: string;
   role: string;
-  email: string;
 };
+
+const JWT_ISSUER = 'faztudo-api';
+const JWT_AUDIENCE = 'faztudo-web';
+
+function getSecret(name: 'JWT_SECRET') {
+  const value = process.env[name];
+  if (!value || value.length < 32 || value.startsWith('change-me') || value.includes('dev-secret')) {
+    throw new Error(`${name} must be configured with at least 32 unpredictable characters`);
+  }
+  return value;
+}
+
+export function validateAuthConfig() {
+  getSecret('JWT_SECRET');
+}
 
 export async function hashPassword(password: string) {
   return argon2.hash(password);
@@ -17,20 +30,22 @@ export async function verifyPassword(hash: string, password: string) {
 }
 
 export function signAccessToken(payload: JwtPayload) {
-  const secret = process.env.JWT_SECRET || 'dev-secret';
-  return jwt.sign(payload, secret, { expiresIn: '15m' });
-}
-
-export function signRefreshToken(payload: JwtPayload) {
-  const secret = process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret';
-  return jwt.sign(payload, secret, { expiresIn: '7d' });
+  return jwt.sign(payload, getSecret('JWT_SECRET'), {
+    algorithm: 'HS256',
+    audience: JWT_AUDIENCE,
+    expiresIn: '15m',
+    issuer: JWT_ISSUER,
+  });
 }
 
 export function verifyAccessToken(token: string) {
-  const secret = process.env.JWT_SECRET || 'dev-secret';
-  return jwt.verify(token, secret) as JwtPayload;
-}
-
-export function generateId() {
-  return randomUUID();
+  const payload = jwt.verify(token, getSecret('JWT_SECRET'), {
+    algorithms: ['HS256'],
+    audience: JWT_AUDIENCE,
+    issuer: JWT_ISSUER,
+  });
+  if (typeof payload === 'string' || typeof payload.sub !== 'string' || typeof payload.role !== 'string') {
+    throw new Error('Invalid token payload');
+  }
+  return payload as JwtPayload;
 }

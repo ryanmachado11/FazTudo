@@ -10,6 +10,19 @@ import { toast } from 'sonner';
 import { apiPost } from '../lib/api';
 import { saveSession } from '../lib/session';
 
+type LoginResponse = {
+  accessToken: string;
+  user: { id: string; name: string; email: string; role: string };
+};
+
+export function safeRedirectPath(value: string | null): string | null {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
+    return null;
+  }
+
+  return value;
+}
+
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,16 +35,16 @@ export default function Login() {
     setIsSubmitting(true);
 
     try {
-      const data = await apiPost('/api/auth/login', {
+      const data = await apiPost<LoginResponse>('/api/auth/login', {
         email,
         password,
       });
 
-      saveSession(data as { accessToken: string; refreshToken: string; user: any });
+      saveSession(data);
       toast.success('Login realizado com sucesso!');
       const params = new URLSearchParams(location.search);
-      const redirectTo = params.get('redirectTo');
-      navigate(redirectTo || ((data as any).user?.role === 'PROVIDER' ? '/dashboard' : '/home'));
+      const redirectTo = safeRedirectPath(params.get('redirectTo'));
+      navigate(redirectTo || (data.user.role === 'PROVIDER' ? '/dashboard' : '/home'), { replace: true });
     } catch (error: any) {
       toast.error(error?.message || 'Falha ao entrar.');
     } finally {
@@ -64,6 +77,8 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                maxLength={254}
+                autoComplete="email"
                 className="bg-input-background"
               />
             </div>
@@ -82,6 +97,8 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                maxLength={128}
+                autoComplete="current-password"
                 className="bg-input-background"
               />
             </div>

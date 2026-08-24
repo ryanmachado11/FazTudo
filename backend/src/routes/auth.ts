@@ -1,24 +1,33 @@
-import { FastifyInstance } from 'fastify';
+import { Prisma } from '@prisma/client';
+import { FastifyInstance, type FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../config/prisma.js';
-import { hashPassword, verifyPassword, signAccessToken, signRefreshToken } from '../lib/auth.js';
+import { hashPassword, verifyPassword, signAccessToken } from '../lib/auth.js';
 import { requireAuth } from '../middleware/auth.js';
+import { createRateLimit } from '../middleware/rate-limit.js';
+
+const DUMMY_PASSWORD_HASH = '$argon2id$v=19$m=65536,p=4,t=3$EZPJf/FcpGcwlQv/PYA65Q$oCRRh4BZPQxzXb5s9LHcpFtUSyAs1Kzrs+F7dostk8M';
+const normalizedEmail = z.string().trim().email().max(254).transform((value) => value.toLowerCase());
+const normalizedPhone = z.string().transform((value) => value.replace(/\D/g, '')).pipe(z.string().regex(/^\d{10,15}$/));
 
 const registerSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
-  phone: z.string().min(8),
-  password: z.string().min(8),
+  name: z.string().trim().min(2).max(120),
+  email: normalizedEmail,
+  phone: normalizedPhone,
+  password: z.string().min(8).max(128),
   role: z.enum(['CLIENT', 'PROVIDER']).optional(),
-});
+}).strict();
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-});
+  email: normalizedEmail,
+  password: z.string().min(1).max(128),
+}).strict();
 
 export async function authRoutes(app: FastifyInstance) {
-  function sendFieldError(reply: any, statusCode: number, fieldErrors: Record<string, string[]>, message: string) {
+  const registerRateLimit = createRateLimit({ limit: 5, windowMs: 60 * 60 * 1000 });
+  const loginRateLimit = createRateLimit({ limit: 10, windowMs: 15 * 60 * 1000 });
+
+  function sendFieldError(reply: FastifyReply, statusCode: number, fieldErrors: Record<string, string[]>, message: string) {
     return reply.code(statusCode).send({
       error: message,
       issues: {
@@ -28,7 +37,7 @@ export async function authRoutes(app: FastifyInstance) {
     });
   }
 
-  app.post('/register', async (request, reply) => {
+  app.post('/register', { preHandler: registerRateLimit }, async (request, reply) => {
     const parsed = registerSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'Invalid payload', issues: parsed.error.flatten() });
@@ -54,20 +63,28 @@ export async function authRoutes(app: FastifyInstance) {
 
     const passwordHash = await hashPassword(password);
 
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        phone,
-        passwordHash,
-        role: role === 'PROVIDER' ? 'PROVIDER' : 'CLIENT',
-      },
-    });
+    let user;
+    try {
+      user = await prisma.user.create({
+        data: {
+          name,
+          email,
+          phone,
+          passwordHash,
+          role: role === 'PROVIDER' ? 'PROVIDER' : 'CLIENT',
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        return reply.code(409).send({ error: 'Dados já cadastrados' });
+      }
+      throw error;
+    }
 
     return reply.code(201).send({ user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   });
 
-  app.post('/login', async (request, reply) => {
+  app.post('/login', { preHandler: loginRateLimit }, async (request, reply) => {
     const parsed = loginSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'Invalid payload' });
@@ -75,19 +92,14 @@ export async function authRoutes(app: FastifyInstance) {
 
     const { email, password } = parsed.data;
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !user.isActive) {
+    const valid = await verifyPassword(user?.passwordHash ?? DUMMY_PASSWORD_HASH, password);
+    if (!user || !user.isActive || !valid) {
       return reply.code(401).send({ error: 'Invalid credentials' });
     }
 
-    const valid = await verifyPassword(user.passwordHash, password);
-    if (!valid) {
-      return reply.code(401).send({ error: 'Invalid credentials' });
-    }
-
-    const payload = { sub: user.id, role: user.role, email: user.email };
+    const payload = { sub: user.id, role: user.role };
     return {
       accessToken: signAccessToken(payload),
-      refreshToken: signRefreshToken(payload),
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     };
   });
@@ -98,9 +110,12 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(401).send({ error: 'Unauthorized' });
     }
 
-    const dbUser = await prisma.user.findUnique({ where: { id: user.sub } });
-    if (!dbUser) {
-      return reply.code(404).send({ error: 'User not found' });
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { id: true, name: true, email: true, role: true, isActive: true },
+    });
+    if (!dbUser?.isActive) {
+      return reply.code(401).send({ error: 'Unauthorized' });
     }
 
     return {

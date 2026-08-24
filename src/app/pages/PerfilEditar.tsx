@@ -51,6 +51,7 @@ export default function PerfilEditar() {
         const profile = await apiGet<any>('/api/provider/profile/me');
         setName(profile.name || currentUser?.name || '');
         setDescription(profile.bio || '');
+        setSpecialties(Array.isArray(profile.specialties) ? profile.specialties : []);
         setRegion([profile.city, profile.neighborhood, profile.state].filter(Boolean).join(' - '));
         setPrice(profile.hourlyRate ? `A partir de R$ ${Number(profile.hourlyRate).toFixed(2)}` : '');
         setCategory(profile.category || 'Eletricista');
@@ -70,12 +71,17 @@ export default function PerfilEditar() {
     try {
       const categoryMatch = availableCategories.find((cat) => cat.name === category);
       const categoryIds = categoryMatch ? [categoryMatch.id] : [];
+      const regionParts = region.split(' - ').map((part) => part.trim()).filter(Boolean);
+      const state = regionParts.length > 1 ? regionParts.at(-1) : undefined;
+      const neighborhood = regionParts.length > 2 ? regionParts.slice(1, -1).join(' - ') : '';
 
       await apiPut('/api/provider/profile/me', {
+        name: name.trim(),
         bio: description,
-        city: region.split(' - ')[0] || '',
-        neighborhood: region.split(' - ')[1] || '',
-        state: region.split(' - ')[2] || '',
+        specialties,
+        city: regionParts[0] || '',
+        neighborhood,
+        state,
         hourlyRate: Number(price.replace(/[^0-9,]/g, '').replace(',', '.')) || 0,
         isUrgentAvailable: true,
         categoryIds,

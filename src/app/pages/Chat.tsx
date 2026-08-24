@@ -16,14 +16,6 @@ type ChatContact = {
   role: 'CLIENT' | 'PROVIDER';
 };
 
-type ServiceChatContext = {
-  serviceRequestId: string;
-  clientId: string;
-  clientName: string;
-  providerId: string;
-  providerName: string;
-};
-
 function initials(name?: string) {
   return (name || 'Contato')
     .split(' ')
@@ -51,55 +43,7 @@ export default function Chat() {
   const [roomId, setRoomId] = useState<string | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [serviceContext, setServiceContext] = useState<ServiceChatContext | null>(null);
-
-  const resolveServiceContext = async (targetServiceRequestId: string) => {
-    const services = await apiGet<any[]>('/api/services');
-    const service = services.find((item) => item.id === targetServiceRequestId);
-
-    if (!service || !service.clientId || !service.providerId) {
-      throw new Error('Servico da conversa nao encontrado.');
-    }
-
-    const context = {
-      serviceRequestId: service.id,
-      clientId: service.clientId,
-      clientName: service.clientName || 'Cliente',
-      providerId: service.providerId,
-      providerName: service.providerName || 'Prestador',
-    };
-
-    setServiceContext(context);
-    return context;
-  };
-
-  const tryResolveServiceContext = async (targetServiceRequestId?: string) => {
-    if (!targetServiceRequestId) return null;
-
-    try {
-      return await resolveServiceContext(targetServiceRequestId);
-    } catch {
-      return null;
-    }
-  };
-
-  const openRoom = async (context?: ServiceChatContext) => {
-    if (context) {
-      try {
-        return await apiPost<any>('/api/chat/rooms', { serviceRequestId: context.serviceRequestId });
-      } catch (error: any) {
-        const legacyPayload =
-          currentUser?.role === 'CLIENT'
-            ? { providerId: context.providerId }
-            : { clientId: context.clientId };
-
-        return apiPost<any>('/api/chat/rooms', legacyPayload);
-      }
-    }
-
-    const roomPayload = currentUser?.role === 'CLIENT' ? { providerId: targetId } : { clientId: targetId };
-    return apiPost<any>('/api/chat/rooms', roomPayload);
-  };
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     const loadConversation = async () => {
@@ -117,22 +61,17 @@ export default function Chat() {
       }
 
       try {
-        const context = await tryResolveServiceContext(targetId);
-
-        if (currentUser.role === 'CLIENT' && !context) {
+        if (currentUser.role === 'CLIENT' && !serviceRequestId) {
           const providerData = await apiGet<any>(`/api/providers/${targetId}`);
           setContact({ id: providerData.id, name: providerData.name || 'Prestador', role: 'PROVIDER' });
-        } else if (context) {
-          setContact(
-            currentUser.role === 'PROVIDER'
-              ? { id: context.clientId, name: context.clientName, role: 'CLIENT' }
-              : { id: context.providerId, name: context.providerName, role: 'PROVIDER' },
-          );
-        } else if (currentUser.role === 'PROVIDER') {
-          setContact({ id: targetId, name: 'Cliente', role: 'CLIENT' });
         }
 
-        const room = await openRoom(context || undefined);
+        const roomPayload = serviceRequestId
+          ? { serviceRequestId }
+          : currentUser.role === 'CLIENT'
+            ? { providerId: targetId }
+            : { clientId: targetId };
+        const room = await apiPost<any>('/api/chat/rooms', roomPayload);
         setRoomId(room.room.id);
 
         if (currentUser.role === 'PROVIDER') {
@@ -149,7 +88,7 @@ export default function Chat() {
           });
         }
 
-        const roomMessages = await apiGet<any[]>(`/api/chat/rooms/${room.room.id}/messages`);
+        const roomMessages = await apiGet<any[]>(`/api/chat/rooms/${room.room.id}/messages?limit=100`);
         setMessages(roomMessages);
       } catch (error: any) {
         setRoomId(null);
@@ -160,7 +99,7 @@ export default function Chat() {
     };
 
     loadConversation();
-  }, [currentUser?.id, currentUser?.role, navigate, targetId]);
+  }, [currentUser?.id, currentUser?.role, navigate, serviceRequestId, targetId]);
 
   useEffect(() => {
     if (!roomId) {
@@ -169,56 +108,41 @@ export default function Chat() {
 
     let isMounted = true;
 
+    let timeoutId: number | undefined;
     const refreshMessages = async () => {
       try {
-        const roomMessages = await apiGet<any[]>(`/api/chat/rooms/${roomId}/messages`);
-        if (isMounted) {
-          setMessages(roomMessages);
+        if (document.visibilityState === 'visible') {
+          const roomMessages = await apiGet<any[]>(`/api/chat/rooms/${roomId}/messages?limit=100`);
+          if (isMounted) {
+            setMessages(roomMessages);
+          }
         }
       } catch {
         // Polling stays quiet; explicit send/open actions surface errors to the user.
+      } finally {
+        if (isMounted) {
+          timeoutId = window.setTimeout(refreshMessages, 3000);
+        }
       }
     };
 
-    const intervalId = window.setInterval(refreshMessages, 3000);
+    timeoutId = window.setTimeout(refreshMessages, 3000);
 
     return () => {
       isMounted = false;
-      window.clearInterval(intervalId);
+      if (timeoutId) window.clearTimeout(timeoutId);
     };
   }, [roomId]);
 
   const handleSend = async () => {
-    if (!message.trim()) return;
+    if (!message.trim() || !roomId || isSending) return;
 
     try {
-      const activeRoomId = roomId;
-      const fallbackContext = serviceContext || (await tryResolveServiceContext(targetId));
-      const messagePayload: Record<string, string> = {
+      setIsSending(true);
+      const messagePayload = {
+        roomId,
         content: message.trim(),
       };
-
-      if (activeRoomId) {
-        messagePayload.roomId = activeRoomId;
-      }
-
-      if (fallbackContext?.serviceRequestId) {
-        messagePayload.serviceRequestId = fallbackContext.serviceRequestId;
-      }
-
-      if (currentUser?.role === 'CLIENT') {
-        const providerId = fallbackContext?.providerId || targetId;
-        if (providerId) {
-          messagePayload.providerId = providerId;
-        }
-      }
-
-      if (currentUser?.role === 'PROVIDER') {
-        const clientId = fallbackContext?.clientId || targetId;
-        if (clientId) {
-          messagePayload.clientId = clientId;
-        }
-      }
 
       const created = await apiPost<any>('/api/chat/messages', messagePayload);
       if (created.room?.id) {
@@ -228,6 +152,8 @@ export default function Chat() {
       setMessage('');
     } catch (error: any) {
       toast.error(error?.message || 'Nao foi possivel enviar a mensagem.');
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -297,10 +223,10 @@ export default function Chat() {
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <Button size="sm" variant="secondary" className="flex-1">
+                          <Button size="sm" variant="secondary" className="flex-1" disabled title="Ações de proposta ainda não disponíveis">
                             Aceitar
                           </Button>
-                          <Button size="sm" variant="outline" className="flex-1">
+                          <Button size="sm" variant="outline" className="flex-1" disabled title="Ações de proposta ainda não disponíveis">
                             Recusar
                           </Button>
                         </div>
@@ -340,7 +266,7 @@ export default function Chat() {
       <div className="border-t border-border bg-card/80 backdrop-blur-sm flex-shrink-0">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-end gap-2">
-            <Button variant="ghost" size="icon" className="flex-shrink-0">
+            <Button variant="ghost" size="icon" className="flex-shrink-0" disabled title="Envio de imagens ainda não disponível">
               <ImageIcon className="h-5 w-5" />
             </Button>
             <div className="flex-1 relative">
@@ -348,6 +274,7 @@ export default function Chat() {
                 placeholder="Digite sua mensagem..."
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
+                maxLength={2000}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault();
@@ -356,7 +283,7 @@ export default function Chat() {
                 }}
                 className="pr-12 min-h-[44px] bg-input-background"
               />
-              <Button variant="ghost" size="icon" className="absolute right-1 bottom-1" onClick={() => {}}>
+              <Button variant="ghost" size="icon" className="absolute right-1 bottom-1" disabled title="Áudio ainda não disponível">
                 <Mic className="h-5 w-5" />
               </Button>
             </div>
@@ -365,7 +292,7 @@ export default function Chat() {
               variant="secondary"
               className="flex-shrink-0 h-11 w-11"
               onClick={handleSend}
-              disabled={!message.trim()}
+              disabled={!message.trim() || !roomId || isSending}
             >
               <Send className="h-5 w-5" />
             </Button>

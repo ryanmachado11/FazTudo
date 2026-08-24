@@ -423,7 +423,7 @@ export default function ProviderDashboard() {
                           Aceitar
                         </Button>
                       )}
-                      <Link to={`/chat/${request.id}`}>
+                      <Link to={`/chat/servico/${request.id}`}>
                         <Button variant="outline" size="sm">
                           <MessageCircle className="h-4 w-4 mr-1" />
                           Chat
@@ -485,7 +485,7 @@ export default function ProviderDashboard() {
                           Finalizar
                         </Button>
                       )}
-                      <Link to={`/chat/${request.id}`}>
+                      <Link to={`/chat/servico/${request.id}`}>
                         <Button variant="outline" size="sm">
                           <MessageCircle className="h-4 w-4 mr-1" />
                           Chat

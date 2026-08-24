@@ -1,20 +1,39 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
-import LandingPage from './pages/LandingPage';
-import ClientHome from './pages/ClientHome';
-import ProviderProfile from './pages/ProviderProfile';
-import Chat from './pages/Chat';
-import ProviderDashboard from './pages/ProviderDashboard';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import Termos from './pages/Termos';
-import Privacidade from './pages/Privacidade';
-import RecuperarSenha from './pages/RecuperarSenha';
-import CadastroPrestador from './pages/CadastroPrestador';
-import PerfilEditar from './pages/PerfilEditar';
-import Urgente from './pages/Urgente';
-import ClientServices from './pages/ClientServices';
-import Messages from './pages/Messages';
+import { lazy, Suspense, type ReactNode } from 'react';
+import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from './components/ui/sonner';
+import { useAuth } from './hooks/useAuth';
+
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const ClientHome = lazy(() => import('./pages/ClientHome'));
+const ProviderProfile = lazy(() => import('./pages/ProviderProfile'));
+const Chat = lazy(() => import('./pages/Chat'));
+const ProviderDashboard = lazy(() => import('./pages/ProviderDashboard'));
+const Login = lazy(() => import('./pages/Login'));
+const Signup = lazy(() => import('./pages/Signup'));
+const Termos = lazy(() => import('./pages/Termos'));
+const Privacidade = lazy(() => import('./pages/Privacidade'));
+const RecuperarSenha = lazy(() => import('./pages/RecuperarSenha'));
+const CadastroPrestador = lazy(() => import('./pages/CadastroPrestador'));
+const PerfilEditar = lazy(() => import('./pages/PerfilEditar'));
+const Urgente = lazy(() => import('./pages/Urgente'));
+const ClientServices = lazy(() => import('./pages/ClientServices'));
+const Messages = lazy(() => import('./pages/Messages'));
+
+function RequireRole({ roles, children }: { roles: string[]; children: ReactNode }) {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return <div className="min-h-screen grid place-items-center text-muted-foreground">Carregando...</div>;
+  }
+
+  if (!user || !roles.includes(user.role)) {
+    const redirectTo = encodeURIComponent(`${location.pathname}${location.search}`);
+    return <Navigate to={`/login?redirectTo=${redirectTo}`} replace />;
+  }
+
+  return children;
+}
 
 function NotFound() {
   return (
@@ -36,25 +55,27 @@ function NotFound() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/home" element={<ClientHome />} />
-        <Route path="/prestador/:id" element={<ProviderProfile />} />
-        <Route path="/chat/servico/:serviceRequestId" element={<Chat />} />
-        <Route path="/chat/:id" element={<Chat />} />
-        <Route path="/dashboard" element={<ProviderDashboard />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/cadastro" element={<Signup />} />
-        <Route path="/termos" element={<Termos />} />
-        <Route path="/privacidade" element={<Privacidade />} />
-        <Route path="/recuperar-senha" element={<RecuperarSenha />} />
-        <Route path="/cadastro-prestador" element={<CadastroPrestador />} />
-        <Route path="/perfil/editar" element={<PerfilEditar />} />
-        <Route path="/urgente" element={<Urgente />} />
-        <Route path="/servicos" element={<ClientServices />} />
-        <Route path="/mensagens" element={<Messages />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <Suspense fallback={<div className="min-h-screen grid place-items-center text-muted-foreground">Carregando...</div>}>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/home" element={<ClientHome />} />
+          <Route path="/prestador/:id" element={<ProviderProfile />} />
+          <Route path="/chat/servico/:serviceRequestId" element={<RequireRole roles={['CLIENT', 'PROVIDER']}><Chat /></RequireRole>} />
+          <Route path="/chat/:id" element={<RequireRole roles={['CLIENT', 'PROVIDER']}><Chat /></RequireRole>} />
+          <Route path="/dashboard" element={<RequireRole roles={['PROVIDER']}><ProviderDashboard /></RequireRole>} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/cadastro" element={<Signup />} />
+          <Route path="/termos" element={<Termos />} />
+          <Route path="/privacidade" element={<Privacidade />} />
+          <Route path="/recuperar-senha" element={<RecuperarSenha />} />
+          <Route path="/cadastro-prestador" element={<CadastroPrestador />} />
+          <Route path="/perfil/editar" element={<RequireRole roles={['PROVIDER']}><PerfilEditar /></RequireRole>} />
+          <Route path="/urgente" element={<RequireRole roles={['CLIENT']}><Urgente /></RequireRole>} />
+          <Route path="/servicos" element={<RequireRole roles={['CLIENT']}><ClientServices /></RequireRole>} />
+          <Route path="/mensagens" element={<RequireRole roles={['CLIENT', 'PROVIDER']}><Messages /></RequireRole>} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
       <Toaster />
     </BrowserRouter>
   );

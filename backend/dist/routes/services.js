@@ -4,10 +4,13 @@ import { requireAuth } from '../middleware/auth.js';
 const requestSchema = z.object({
     categoryId: z.string().uuid().optional(),
     providerId: z.string().uuid().optional(),
-    description: z.string().min(10),
+    description: z.string().trim().min(10).max(5000),
     urgencyFlag: z.boolean().optional(),
-    scheduledFor: z.string().optional(),
-});
+    scheduledFor: z.string().datetime({ offset: true }).optional(),
+}).strict();
+const listQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(100).default(100),
+}).strict();
 const paramsSchema = z.object({
     id: z.string().uuid(),
 });
@@ -23,15 +26,27 @@ export async function servicesRoutes(app) {
         if (user.role !== 'CLIENT' && user.role !== 'PROVIDER') {
             return reply.code(403).send({ error: 'Only clients and providers can list services' });
         }
+        const parsedQuery = listQuerySchema.safeParse(request.query);
+        if (!parsedQuery.success) {
+            return reply.code(400).send({ error: 'Invalid query', issues: parsedQuery.error.flatten() });
+        }
         const services = await prisma.serviceRequest.findMany({
             where: user.role === 'CLIENT' ? { clientId: user.sub } : { providerId: user.sub },
-            include: {
-                client: true,
-                provider: true,
-                category: true,
-                reviews: true,
+            select: {
+                id: true,
+                clientId: true,
+                providerId: true,
+                status: true,
+                description: true,
+                scheduledFor: true,
+                createdAt: true,
+                client: { select: { name: true } },
+                provider: { select: { name: true } },
+                category: { select: { id: true, name: true } },
+                _count: { select: { reviews: true } },
             },
             orderBy: { createdAt: 'desc' },
+            take: parsedQuery.data.limit,
         });
         return services.map((service) => ({
             id: service.id,
@@ -39,13 +54,13 @@ export async function servicesRoutes(app) {
             clientName: service.client.name,
             providerId: service.providerId,
             providerName: service.provider?.name ?? 'Prestador',
-            categoryId: service.categoryId,
+            categoryId: service.category.id,
             categoryName: service.category.name,
             status: service.status,
             description: service.description,
             scheduledFor: service.scheduledFor,
             createdAt: service.createdAt,
-            hasReview: service.reviews.length > 0,
+            hasReview: service._count.reviews > 0,
         }));
     });
     app.post('/', { preHandler: requireAuth }, async (request, reply) => {
@@ -66,13 +81,23 @@ export async function servicesRoutes(app) {
         if (providerId) {
             provider = await prisma.providerProfile.findUnique({
                 where: { userId: providerId },
-                include: { user: true, categories: { include: { category: true } } },
+                select: {
+                    isUrgentAvailable: true,
+                    isVerified: true,
+                    user: { select: { role: true, isActive: true } },
+                    categories: {
+                        select: { categoryId: true, category: { select: { isActive: true } } },
+                    },
+                },
             });
             if (!provider || provider.user.role !== 'PROVIDER' || !provider.user.isActive) {
                 return reply.code(404).send({ error: 'Provider not found' });
             }
             if (!provider.isVerified) {
                 return reply.code(403).send({ error: 'Provider is not verified yet' });
+            }
+            if (urgencyFlag && !provider.isUrgentAvailable) {
+                return reply.code(409).send({ error: 'Provider is not available for urgent requests' });
             }
             resolvedCategoryId ??= provider.categories.find((entry) => entry.category.isActive)?.categoryId;
             if (!resolvedCategoryId) {
@@ -140,10 +165,14 @@ export async function servicesRoutes(app) {
         if (!allowedNextStatuses.includes(nextStatus)) {
             return reply.code(409).send({ error: `Cannot change service from ${service.status} to ${nextStatus}` });
         }
-        const updated = await prisma.serviceRequest.update({
-            where: { id: service.id },
+        const result = await prisma.serviceRequest.updateMany({
+            where: { id: service.id, status: service.status },
             data: { status: nextStatus },
         });
+        if (result.count !== 1) {
+            return reply.code(409).send({ error: 'Service status changed; reload and try again' });
+        }
+        const updated = await prisma.serviceRequest.findUnique({ where: { id: service.id } });
         return reply.code(200).send({ service: updated });
     });
 }

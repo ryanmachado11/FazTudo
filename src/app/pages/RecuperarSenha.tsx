@@ -10,14 +10,11 @@ import { toast } from 'sonner';
 export default function RecuperarSenha() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
-  const [isSent, setIsSent] = useState(false);
+  const [isSent] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (email.trim()) {
-      setIsSent(true);
-      toast.success('Link de recuperação enviado com sucesso!');
-    }
+    toast.error('A recuperação por e-mail ainda não está configurada.');
   };
 
   return (
@@ -40,7 +37,7 @@ export default function RecuperarSenha() {
             </button>
             <h1 className="text-2xl font-bold text-foreground mb-2">Recuperar senha</h1>
             <p className="text-muted-foreground text-sm">
-              Insira o e-mail associado à sua conta e enviaremos as instruções para redefinir sua senha.
+              A recuperação por e-mail ainda não está disponível. Não enviaremos um link até que o serviço de e-mail seja configurado.
             </p>
           </div>
 
@@ -59,8 +56,8 @@ export default function RecuperarSenha() {
                 />
               </div>
 
-              <Button type="submit" variant="secondary" size="lg" className="w-full">
-                Enviar link de recuperação
+              <Button type="submit" variant="secondary" size="lg" className="w-full" disabled>
+                Recuperação indisponível
               </Button>
             </form>
           ) : (

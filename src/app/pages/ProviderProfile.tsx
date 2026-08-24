@@ -193,6 +193,7 @@ export default function ProviderProfile() {
                       setDescription(e.target.value);
                       setBookingError('');
                     }}
+                    maxLength={2000}
                   />
                   {bookingError && (
                     <p className="text-sm font-medium text-destructive">{bookingError}</p>
@@ -230,7 +231,7 @@ export default function ProviderProfile() {
                         setIsBooking(false);
                         setDescription('');
                         
-                        navigate(`/chat/${createdService.service.id}`);
+                        navigate(`/chat/servico/${createdService.service.id}`);
                       } catch (error: any) {
                         const message = error?.message || 'Falha ao contratar.';
                         setBookingError(message);

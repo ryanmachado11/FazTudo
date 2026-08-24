@@ -7,6 +7,7 @@ const categoriesData = [
   { name: 'Eletricista', slug: 'eletricista', iconUrl: '/icons/eletricista.svg' },
   { name: 'Encanador', slug: 'encanador', iconUrl: '/icons/encanador.svg' },
   { name: 'Montador de Móveis', slug: 'montador-de-moveis', iconUrl: '/icons/montador.svg' },
+  { name: 'Chaveiro', slug: 'chaveiro', iconUrl: '/icons/chaveiro.svg' },
 ];
 
 async function main() {
@@ -163,6 +164,7 @@ async function main() {
       where: { userId },
       update: {
         bio: prov.bio,
+        specialties: prov.specialties,
         hourlyRate: prov.hourlyRate,
         averageRating: prov.averageRating,
         totalReviews: prov.totalReviews,
@@ -174,6 +176,7 @@ async function main() {
       create: {
         userId,
         bio: prov.bio,
+        specialties: prov.specialties,
         hourlyRate: prov.hourlyRate,
         averageRating: prov.averageRating,
         totalReviews: prov.totalReviews,
@@ -229,6 +232,7 @@ async function main() {
         update: {
           rating: rev.rating,
           comment: rev.comment,
+          status: 'APPROVED',
         },
         create: {
           id: `mock-review-${userId}-${clientId}`,
@@ -237,6 +241,7 @@ async function main() {
           providerId: userId,
           rating: rev.rating,
           comment: rev.comment,
+          status: 'APPROVED',
         },
       });
     }

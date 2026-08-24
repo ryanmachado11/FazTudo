@@ -147,7 +147,7 @@ export default function ClientServices() {
                   <div className="flex flex-wrap gap-2">
                     <Badge className={statusTone(service.status)}>{statusLabel(service.status)}</Badge>
                     {service.providerId && (
-                      <Link to={`/chat/${service.id}`}>
+                      <Link to={`/chat/servico/${service.id}`}>
                         <Button variant="outline" size="sm">
                           <MessageCircle className="h-4 w-4 mr-1" />
                           Chat
@@ -182,6 +182,7 @@ export default function ClientServices() {
                     <Textarea
                       value={comment}
                       onChange={(event) => setComment(event.target.value)}
+                      maxLength={2000}
                       placeholder="Conte como foi o atendimento"
                       className="bg-input-background"
                     />
