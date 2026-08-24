@@ -3,11 +3,11 @@ Uma plataforma simples para conectar clientes a assuntos de serviços de sua reg
 
 O FazTudo+ foi criado para facilitar a contratação de profissionais como eletricistas, encanadores, pedreiros e pintores. A proposta é oferecer uma experiência direta e acessível, inclusive para pessoas com pouca familiaridade com tecnologia.
 
-Na plataforma, o cliente poderá encontrar informações por categoria, consultar informações do perfil, verificar avaliações e iniciar a conversa através do chat interno. Já o prestador terá um painel próprio para acompanhar clientes, serviços e dados financeiros.
+Na plataforma, o cliente poderá encontrar informações por categoria, consultar informações do perfil, verificar avaliações e iniciar a conversa através do chat interno. Já o prestador terá um painel próprio para acompanhar clientes e serviços.
 
 *Objetivo:
 
-Centralizar a busca por entrevistas de serviços em um ambiente simples, organizado e confiável, ajudando os clientes a encontrar profissionais e permitindo que as conversas gerenciem melhor o próprio trabalho.
+Centralizar a busca por serviços em um ambiente simples, organizado e confiável, ajudando os clientes a encontrar profissionais e permitindo que as conversas gerenciem melhor o próprio trabalho.
 
 *Funcionalidades do FazTudo+
 
@@ -19,8 +19,6 @@ Busca de discussão por categoria e região;
 
 Visualização do perfil, disponibilidade e avaliações do profissional;
 
-Contato direto com o prestador pelo WhatsApp;
-
 Avaliação do profissional após a realização do serviço.
 
 -Para prestadores de serviços:
@@ -29,11 +27,9 @@ Cadastro de perfil profissional;
 
 Definição das categorias de serviços atendidos;
 
-Controle de disponibilidade por meio do status on-line ou off-line;
+Controle de disponibilidade por meio do status online ou offline;
 
 Painel para acompanhamento de clientes e serviços;
-
-Visão geral de receitas e informações financeiras;
 
 Histórico e média das receitas recebidas.
 
@@ -45,18 +41,11 @@ Histórico e média das receitas recebidas.
 
 3.O cliente analisa os perfis e as avaliações.
 
-4.O contato e a negociação são feitos diretamente pelo WhatsApp.
+4.0.Depois do serviço, o cliente pode avaliar o prestador.
 
-5.Depois do serviço, o cliente pode avaliar o prestador.
+Projeto desenvolvido pela equipe 3405DS:
 
-*Equipar:
-
-Projeto desenvolvido pela equipe 3405:
-
--João Lucas Dionísio;
-
--Ryan;
-
--Erick;
-
--Gustavo.
+- Erick Guilherme;
+- João Lucas Dionísio;
+- Gustavo Vilas Boas;
+- Ryan Mizael;
