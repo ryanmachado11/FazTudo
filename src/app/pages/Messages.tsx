@@ -17,6 +17,7 @@ type ChatRoomItem = {
   providerName?: string;
   lastMessage?: string;
   lastMessageAt?: string;
+  unreadCount?: number;
 };
 
 function initials(name?: string) {
@@ -46,6 +47,8 @@ export default function Messages() {
   const currentUser = getCurrentUser();
   const [rooms, setRooms] = useState<ChatRoomItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     if (!currentUser || (currentUser.role !== 'CLIENT' && currentUser.role !== 'PROVIDER')) {
@@ -57,15 +60,19 @@ export default function Messages() {
     let isMounted = true;
     let timeoutId: number | undefined;
     let hasReportedError = false;
+    setLoading(true);
+    setLoadError('');
 
     const loadRooms = async () => {
       try {
         const data = await apiGet<ChatRoomItem[]>('/api/chat/rooms');
         if (isMounted) {
           setRooms(data);
+          setLoadError('');
           hasReportedError = false;
         }
       } catch (error: any) {
+        if (isMounted) setLoadError(error?.message || 'Não foi possível carregar suas mensagens.');
         if (!hasReportedError) {
           toast.error(error?.message || 'Não foi possível carregar suas mensagens.');
           hasReportedError = true;
@@ -84,7 +91,7 @@ export default function Messages() {
       isMounted = false;
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [currentUser?.id, currentUser?.role, navigate]);
+  }, [currentUser?.id, currentUser?.role, navigate, retryKey]);
 
   const backPath = currentUser?.role === 'PROVIDER' ? '/dashboard' : '/home';
 
@@ -113,6 +120,14 @@ export default function Messages() {
 
         {loading ? (
           <Card className="p-6 text-muted-foreground">Carregando conversas...</Card>
+        ) : loadError ? (
+          <Card className="p-8 text-center">
+            <h2 className="text-lg font-semibold text-foreground">Não foi possível carregar suas mensagens</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Verifique sua conexão e tente novamente.</p>
+            <Button className="mt-4" variant="secondary" onClick={() => setRetryKey((current) => current + 1)}>
+              Tentar novamente
+            </Button>
+          </Card>
         ) : rooms.length === 0 ? (
           <Card className="p-8 text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-secondary/10 text-secondary">
@@ -153,6 +168,11 @@ export default function Messages() {
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">{formatDate(room.lastMessageAt)}</p>
                       </div>
+                      {!!room.unreadCount && (
+                        <span className="min-w-5 rounded-full bg-secondary px-1.5 py-0.5 text-center text-xs font-semibold text-secondary-foreground">
+                          {room.unreadCount}
+                        </span>
+                      )}
                     </div>
                     {chatPath ? (
                       <Link to={chatPath}>

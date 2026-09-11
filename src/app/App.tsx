@@ -27,9 +27,31 @@ function RequireRole({ roles, children }: { roles: string[]; children: ReactNode
     return <div className="min-h-screen grid place-items-center text-muted-foreground">Carregando...</div>;
   }
 
-  if (!user || !roles.includes(user.role)) {
+  if (!user) {
     const redirectTo = encodeURIComponent(`${location.pathname}${location.search}`);
     return <Navigate to={`/login?redirectTo=${redirectTo}`} replace />;
+  }
+
+  if (!roles.includes(user.role)) {
+    return <Navigate to={roleHome(user.role)} replace />;
+  }
+
+  return children;
+}
+
+function roleHome(role: string) {
+  return role === 'PROVIDER' ? '/dashboard' : '/home';
+}
+
+function RequireGuest({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div className="min-h-screen grid place-items-center text-muted-foreground">Carregando...</div>;
+  }
+
+  if (user) {
+    return <Navigate to={roleHome(user.role)} replace />;
   }
 
   return children;
@@ -58,17 +80,17 @@ export default function App() {
       <Suspense fallback={<div className="min-h-screen grid place-items-center text-muted-foreground">Carregando...</div>}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/home" element={<ClientHome />} />
+          <Route path="/home" element={<RequireRole roles={['CLIENT', 'PROVIDER']}><ClientHome /></RequireRole>} />
           <Route path="/prestador/:id" element={<ProviderProfile />} />
           <Route path="/chat/servico/:serviceRequestId" element={<RequireRole roles={['CLIENT', 'PROVIDER']}><Chat /></RequireRole>} />
           <Route path="/chat/:id" element={<RequireRole roles={['CLIENT', 'PROVIDER']}><Chat /></RequireRole>} />
           <Route path="/dashboard" element={<RequireRole roles={['PROVIDER']}><ProviderDashboard /></RequireRole>} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/cadastro" element={<Signup />} />
+          <Route path="/login" element={<RequireGuest><Login /></RequireGuest>} />
+          <Route path="/cadastro" element={<RequireGuest><Signup /></RequireGuest>} />
           <Route path="/termos" element={<Termos />} />
           <Route path="/privacidade" element={<Privacidade />} />
           <Route path="/recuperar-senha" element={<RecuperarSenha />} />
-          <Route path="/cadastro-prestador" element={<CadastroPrestador />} />
+          <Route path="/cadastro-prestador" element={<RequireGuest><CadastroPrestador /></RequireGuest>} />
           <Route path="/perfil/editar" element={<RequireRole roles={['PROVIDER']}><PerfilEditar /></RequireRole>} />
           <Route path="/urgente" element={<RequireRole roles={['CLIENT']}><Urgente /></RequireRole>} />
           <Route path="/servicos" element={<RequireRole roles={['CLIENT']}><ClientServices /></RequireRole>} />

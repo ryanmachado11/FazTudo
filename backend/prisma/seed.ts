@@ -4,14 +4,49 @@ import argon2 from 'argon2';
 const prisma = new PrismaClient();
 
 const categoriesData = [
-  { name: 'Eletricista', slug: 'eletricista', iconUrl: '/icons/eletricista.svg' },
-  { name: 'Encanador', slug: 'encanador', iconUrl: '/icons/encanador.svg' },
-  { name: 'Montador de Móveis', slug: 'montador-de-moveis', iconUrl: '/icons/montador.svg' },
-  { name: 'Chaveiro', slug: 'chaveiro', iconUrl: '/icons/chaveiro.svg' },
+  { name: 'Elétrica', slug: 'eletrica', iconUrl: '/icons/eletrica.svg' },
+  { name: 'Hidráulica', slug: 'hidraulica', iconUrl: '/icons/hidraulica.svg' },
+  { name: 'Reforma e Acabamento', slug: 'reforma-acabamento', iconUrl: '/icons/reforma-acabamento.svg' },
+  { name: 'Montagem e Instalação', slug: 'montagem-instalacao', iconUrl: '/icons/montagem-instalacao.svg' },
+  { name: 'Estrutura e Reparos Gerais', slug: 'estrutura-reparos', iconUrl: '/icons/estrutura-reparos.svg' },
+  { name: 'Área Externa', slug: 'area-externa', iconUrl: '/icons/area-externa.svg' },
+  { name: 'Serviços Faz-Tudo', slug: 'servicos-faz-tudo', iconUrl: '/icons/servicos-faz-tudo.svg' },
+  { name: 'Climatização e Refrigeração', slug: 'climatizacao-refrigeracao', iconUrl: '/icons/climatizacao-refrigeracao.svg' },
+  { name: 'Segurança Residencial e CFTV', slug: 'seguranca-cftv', iconUrl: '/icons/seguranca-cftv.svg' },
+  { name: 'Limpeza e Higienização', slug: 'limpeza-higienizacao', iconUrl: '/icons/limpeza-higienizacao.svg' },
+  { name: 'Vidraçaria e Esquadrias', slug: 'vidracaria-esquadrias', iconUrl: '/icons/vidracaria-esquadrias.svg' },
+  { name: 'Marcenaria e Carpintaria', slug: 'marcenaria-carpintaria', iconUrl: '/icons/marcenaria-carpintaria.svg' },
+  { name: 'Eletrodomésticos e Linha Branca', slug: 'eletrodomesticos-linha-branca', iconUrl: '/icons/eletrodomesticos-linha-branca.svg' },
+  { name: 'Gás e Aquecimento', slug: 'gas-aquecimento', iconUrl: '/icons/gas-aquecimento.svg' },
+  { name: 'Tecnologia, Redes e Smart Home', slug: 'tecnologia-smart-home', iconUrl: '/icons/tecnologia-smart-home.svg' },
+  { name: 'Pisos e Revestimentos', slug: 'pisos-revestimentos', iconUrl: '/icons/pisos-revestimentos.svg' },
+  { name: 'Fretes e Mudanças Leves', slug: 'fretes-mudancas', iconUrl: '/icons/fretes-mudancas.svg' },
+  { name: 'Redes de Proteção e Segurança Infantil', slug: 'redes-protecao', iconUrl: '/icons/redes-protecao.svg' },
+  { name: 'Piscinas e Área de Lazer', slug: 'piscinas-lazer', iconUrl: '/icons/piscinas-lazer.svg' },
+  { name: 'Serralharia e Estruturas Metálicas', slug: 'serralharia-estruturas', iconUrl: '/icons/serralharia-estruturas.svg' },
+  { name: 'Controle de Pragas e Sanitização', slug: 'controle-pragas', iconUrl: '/icons/controle-pragas.svg' },
+  { name: 'Organização e Decoração', slug: 'organizacao-decoracao', iconUrl: '/icons/organizacao-decoracao.svg' },
 ];
 
 async function main() {
   console.log('Seeding categories...');
+  const legacyCategories = [
+    { oldSlug: 'eletricista', name: 'Elétrica', slug: 'eletrica', iconUrl: '/icons/eletrica.svg' },
+    { oldSlug: 'encanador', name: 'Hidráulica', slug: 'hidraulica', iconUrl: '/icons/hidraulica.svg' },
+    { oldSlug: 'montador-de-moveis', name: 'Montagem e Instalação', slug: 'montagem-instalacao', iconUrl: '/icons/montagem-instalacao.svg' },
+    { oldSlug: 'chaveiro', name: 'Estrutura e Reparos Gerais', slug: 'estrutura-reparos', iconUrl: '/icons/estrutura-reparos.svg' },
+  ];
+  for (const category of legacyCategories) {
+    const legacy = await prisma.category.findUnique({ where: { slug: category.oldSlug } });
+    const canonical = await prisma.category.findUnique({ where: { slug: category.slug } });
+    if (legacy && !canonical) {
+      await prisma.category.update({
+        where: { id: legacy.id },
+        data: { name: category.name, slug: category.slug, iconUrl: category.iconUrl },
+      });
+    }
+  }
+
   const categoryMap: Record<string, string> = {};
   for (const cat of categoriesData) {
     const created = await prisma.category.upsert({
@@ -20,6 +55,31 @@ async function main() {
       create: cat,
     });
     categoryMap[cat.slug] = created.id;
+  }
+
+  for (const legacySlug of ['eletricista', 'encanador', 'montador-de-moveis', 'chaveiro']) {
+    const legacy = await prisma.category.findUnique({ where: { slug: legacySlug } });
+    if (!legacy) continue;
+    const targetSlug = legacySlug === 'eletricista'
+      ? 'eletrica'
+      : legacySlug === 'encanador'
+        ? 'hidraulica'
+        : legacySlug === 'montador-de-moveis'
+          ? 'montagem-instalacao'
+          : 'estrutura-reparos';
+    const canonicalId = categoryMap[targetSlug];
+    if (!canonicalId) continue;
+    const links = await prisma.providerCategory.findMany({ where: { categoryId: legacy.id } });
+    for (const link of links) {
+      await prisma.providerCategory.upsert({
+        where: { providerProfileId_categoryId: { providerProfileId: link.providerProfileId, categoryId: canonicalId } },
+        update: {},
+        create: { providerProfileId: link.providerProfileId, categoryId: canonicalId },
+      });
+    }
+    await prisma.providerCategory.deleteMany({ where: { categoryId: legacy.id } });
+    await prisma.serviceRequest.updateMany({ where: { categoryId: legacy.id }, data: { categoryId: canonicalId } });
+    await prisma.category.update({ where: { id: legacy.id }, data: { isActive: false } });
   }
 
   console.log('Seeding admin user...');
@@ -78,7 +138,7 @@ async function main() {
       name: 'Carlos Silva',
       email: 'carlos@example.com',
       phone: '+5511977770001',
-      categorySlug: 'eletricista',
+      categorySlug: 'eletrica',
       bio: 'Profissional com mais de 10 anos de experiência em instalações elétricas residenciais e comerciais. Atendimento rápido, seguro e com preço justo.',
       hourlyRate: 80.0,
       averageRating: 4.9,
@@ -95,7 +155,7 @@ async function main() {
       name: 'Roberto Santos',
       email: 'roberto@example.com',
       phone: '+5511977770002',
-      categorySlug: 'encanador',
+      categorySlug: 'hidraulica',
       bio: 'Especialista em detecção de vazamentos e desentupimentos em geral. Equipamentos modernos e atendimento limpo para sua residência ou empresa.',
       hourlyRate: 70.0,
       averageRating: 4.8,
@@ -111,7 +171,7 @@ async function main() {
       name: 'Paulo Costa',
       email: 'paulo@example.com',
       phone: '+5511977770003',
-      categorySlug: 'montador-de-moveis',
+      categorySlug: 'montagem-instalacao',
       bio: 'Montagem e desmontagem de móveis convencionais e planejados de todas as marcas. Trabalho detalhista para garantir a durabilidade dos seus móveis.',
       hourlyRate: 60.0,
       averageRating: 5.0,
@@ -127,7 +187,7 @@ async function main() {
       name: 'Fernando Lima',
       email: 'fernando@example.com',
       phone: '+5511977770004',
-      categorySlug: 'eletricista',
+      categorySlug: 'eletrica',
       bio: 'Especializado em projetos de iluminação, instalação de lustres, fitas LED e sistemas de automação de ambientes (Alexa/Google Home).',
       hourlyRate: 75.0,
       averageRating: 4.7,

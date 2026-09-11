@@ -78,7 +78,7 @@ export default function Termos() {
             <section className="space-y-3">
               <h2 className="text-xl font-semibold text-foreground">6. Limitação de Responsabilidade</h2>
               <p>
-                O FazTudo+ empenha-se em verificar os documentos dos prestadores de serviço cadastrados para oferecer maior segurança aos clientes. No entanto, não nos responsabilizamos por danos indiretos, lucros cessantes, acidentes de trabalho ou perda de dados decorrentes da contratação de prestadores ou uso dos serviços.
+                O FazTudo+ pode confirmar dados básicos de cadastro e contato informados pelos prestadores, mas não realiza verificação documental, de identidade ou criminal. No entanto, não nos responsabilizamos por danos indiretos, lucros cessantes, acidentes de trabalho ou perda de dados decorrentes da contratação de prestadores ou uso dos serviços.
               </p>
             </section>
 

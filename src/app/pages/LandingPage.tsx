@@ -57,13 +57,13 @@ export default function LandingPage() {
             <div className="space-y-6">
               <Badge className="bg-secondary/10 text-secondary border-secondary/20 flex items-center gap-1.5 w-fit px-3 py-1 text-sm font-medium">
                 <Shield className="h-4 w-4" />
-                Profissionais verificados
+                Perfis com dados cadastrais confirmados
               </Badge>
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-tight">
                 Contrate profissionais de confiança
               </h1>
               <p className="text-lg text-muted-foreground leading-relaxed">
-                Eletricistas, encanadores e montadores verificados prontos para te atender.
+                Eletricistas, encanadores e montadores com dados cadastrais informados, prontos para te atender.
                 Rápido, seguro e sem complicação.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 pt-4">
@@ -117,7 +117,7 @@ export default function LandingPage() {
                   + 10.000 serviços realizados
                 </div>
 
-                {/* Selo Documentos Verificados */}
+                {/* Selo de dados cadastrais */}
                 <Card className="absolute -bottom-6 -right-6 sm:-bottom-8 sm:-right-12 w-[210px] sm:w-[250px] p-4 bg-card rounded-2xl border border-border/60 shadow-lg hover:scale-105 transition-all duration-300 z-20">
                   <div className="flex items-start gap-2.5">
                     <div className="h-6 w-6 rounded-full bg-success/10 flex items-center justify-center text-success shrink-0 mt-0.5">
@@ -126,8 +126,8 @@ export default function LandingPage() {
                       </svg>
                     </div>
                     <div className="min-w-0">
-                      <h4 className="font-bold text-[#2d9f5e] text-xs sm:text-sm">Documentos verificados</h4>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 leading-tight">CPF, RG e comprovante validados</p>
+                      <h4 className="font-bold text-[#2d9f5e] text-xs sm:text-sm">Dados cadastrais confirmados</h4>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 leading-tight">Nome, e-mail e telefone informados no cadastro</p>
                     </div>
                   </div>
                 </Card>
@@ -149,7 +149,7 @@ export default function LandingPage() {
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {(categories.length > 0 ? categories : serviceCategories.slice(0, 3)).map((cat) => {
+            {(categories.length > 0 ? categories : serviceCategories).map((cat) => {
               // Find matching details from static data to retain description/subcategories if matched
               const matchedStatic = serviceCategories.find(
                 (sc) =>
@@ -236,7 +236,7 @@ export default function LandingPage() {
               </div>
               <h3 className="text-xl font-semibold">Contrate com confiança</h3>
               <p className="text-muted-foreground">
-                Profissional verificado realiza o serviço e você avalia
+                Profissional com dados cadastrais confirmados realiza o serviço e você avalia
               </p>
             </div>
           </div>
@@ -251,15 +251,15 @@ export default function LandingPage() {
               Sua segurança em primeiro lugar
             </h2>
             <p className="text-lg text-muted-foreground">
-              Todos os profissionais são verificados
+              Perfis com dados cadastrais confirmados
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
             <Card className="p-6 text-center">
               <Shield className="h-12 w-12 text-secondary mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Documentos verificados</h3>
+              <h3 className="text-lg font-semibold mb-2">Verificação cadastral</h3>
               <p className="text-muted-foreground text-sm">
-                CPF, RG e comprovante de residência validados
+                Nome, e-mail e telefone informados no cadastro
               </p>
             </Card>
             <Card className="p-6 text-center">

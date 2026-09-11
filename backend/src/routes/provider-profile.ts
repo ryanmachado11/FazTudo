@@ -24,19 +24,13 @@ export async function providerProfileRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: 'Only providers can access this route' });
     }
 
-    const [verification, profile] = await Promise.all([
-      prisma.userVerification.findFirst({
-        where: { userId: user.sub },
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.providerProfile.findUnique({
-        where: { userId: user.sub },
-        include: {
-          user: { select: { name: true, email: true } },
-          categories: { include: { category: true } },
-        },
-      }),
-    ]);
+    const profile = await prisma.providerProfile.findUnique({
+      where: { userId: user.sub },
+      include: {
+        user: { select: { name: true, email: true, avatarUrl: true } },
+        categories: { include: { category: true } },
+      },
+    });
 
     if (!profile) {
       return reply.code(404).send({ error: 'Provider profile not found' });
@@ -47,6 +41,7 @@ export async function providerProfileRoutes(app: FastifyInstance) {
       userId: profile.userId,
       name: profile.user.name,
       email: profile.user.email,
+      avatarUrl: profile.user.avatarUrl,
       bio: profile.bio,
       specialties: Array.isArray(profile.specialties) ? profile.specialties : [],
       city: profile.city,
@@ -55,9 +50,6 @@ export async function providerProfileRoutes(app: FastifyInstance) {
       hourlyRate: profile.hourlyRate,
       isUrgentAvailable: profile.isUrgentAvailable,
       isVerified: profile.isVerified,
-      verificationStatus: verification?.status ?? 'NONE',
-      verificationReviewedAt: verification?.reviewedAt ?? null,
-      verificationRejectionReason: verification?.rejectionReason ?? null,
       category: profile.categories[0]?.category.name ?? 'Prestador',
       categoryId: profile.categories[0]?.category.id ?? null,
       categoryIds: profile.categories.map((entry) => entry.category.id),
@@ -132,7 +124,7 @@ export async function providerProfileRoutes(app: FastifyInstance) {
       return tx.providerProfile.findUnique({
         where: { userId: user.sub },
         include: {
-          user: { select: { name: true, email: true } },
+          user: { select: { name: true, email: true, avatarUrl: true } },
           categories: { include: { category: true } },
         },
       });
@@ -147,6 +139,7 @@ export async function providerProfileRoutes(app: FastifyInstance) {
       userId: profile.userId,
       name: profile.user.name,
       email: profile.user.email,
+      avatarUrl: profile.user.avatarUrl,
       bio: profile.bio,
       specialties: Array.isArray(profile.specialties) ? profile.specialties : [],
       city: profile.city,
@@ -155,10 +148,6 @@ export async function providerProfileRoutes(app: FastifyInstance) {
       hourlyRate: profile.hourlyRate,
       isUrgentAvailable: profile.isUrgentAvailable,
       isVerified: profile.isVerified,
-      verificationStatus: (await prisma.userVerification.findFirst({
-        where: { userId: user.sub },
-        orderBy: { createdAt: 'desc' },
-      }))?.status ?? 'NONE',
       category: profile.categories[0]?.category.name ?? 'Prestador',
       categoryId: profile.categories[0]?.category.id ?? null,
       categoryIds: profile.categories.map((entry) => entry.category.id),

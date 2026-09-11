@@ -5,25 +5,53 @@ import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Avatar, AvatarFallback } from '../components/ui/avatar';
+import { ProfilePhoto } from '../components/ProfilePhoto';
 import { ChevronLeft, Wrench, Save, X, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiGet, apiPut } from '../lib/api';
 import { getCurrentUser } from '../lib/session';
+
+function parseHourlyRate(value: string) {
+  const numericValue = value.replace(/[^0-9,.-]/g, '');
+  if (!numericValue) return 0;
+
+  const commaIndex = numericValue.lastIndexOf(',');
+  const dotIndex = numericValue.lastIndexOf('.');
+  let normalizedValue = numericValue;
+
+  if (commaIndex >= 0 && dotIndex >= 0) {
+    const decimalSeparator = commaIndex > dotIndex ? ',' : '.';
+    const thousandsSeparator = decimalSeparator === ',' ? '.' : ',';
+    normalizedValue = numericValue
+      .split(thousandsSeparator).join('')
+      .replace(decimalSeparator, '.');
+  } else if (commaIndex >= 0) {
+    normalizedValue = numericValue.replace(',', '.');
+  }
+
+  const parsedValue = Number(normalizedValue);
+  return Number.isFinite(parsedValue) ? parsedValue : 0;
+}
 
 export default function PerfilEditar() {
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
 
   const [name, setName] = useState(currentUser?.name || '');
-  const [category, setCategory] = useState('Eletricista');
+  const [category, setCategory] = useState('Elétrica');
   const [price, setPrice] = useState('');
   const [region, setRegion] = useState('');
   const [description, setDescription] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(currentUser?.avatarUrl || null);
   const [specialties, setSpecialties] = useState<string[]>([]);
   const [newSpecialty, setNewSpecialty] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [availableCategories, setAvailableCategories] = useState<any[]>([]);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
 
   const handleAddSpecialty = () => {
     if (newSpecialty.trim() && !specialties.includes(newSpecialty.trim())) {
@@ -37,32 +65,51 @@ export default function PerfilEditar() {
   };
 
   useEffect(() => {
+    let isMounted = true;
+    setIsLoadingProfile(true);
+    setProfileLoaded(false);
+    setLoadError('');
+    setCategoriesLoaded(false);
+
     const loadCategories = async () => {
       try {
         const categories = await apiGet<any[]>('/api/categories');
-        setAvailableCategories(categories);
+        if (isMounted) {
+          setAvailableCategories(categories);
+          setCategoriesLoaded(true);
+        }
       } catch (error) {
         console.error(error);
+        if (isMounted) setLoadError('Não foi possível carregar as categorias do perfil.');
       }
     };
 
     const loadProfile = async () => {
       try {
         const profile = await apiGet<any>('/api/provider/profile/me');
-        setName(profile.name || currentUser?.name || '');
-        setDescription(profile.bio || '');
-        setSpecialties(Array.isArray(profile.specialties) ? profile.specialties : []);
-        setRegion([profile.city, profile.neighborhood, profile.state].filter(Boolean).join(' - '));
-        setPrice(profile.hourlyRate ? `A partir de R$ ${Number(profile.hourlyRate).toFixed(2)}` : '');
-        setCategory(profile.category || 'Eletricista');
+        if (isMounted) {
+          setName(profile.name || currentUser?.name || '');
+          setAvatarUrl(profile.avatarUrl || null);
+          setDescription(profile.bio || '');
+          setSpecialties(Array.isArray(profile.specialties) ? profile.specialties : []);
+          setRegion([profile.city, profile.neighborhood, profile.state].filter(Boolean).join(' - '));
+          setPrice(profile.hourlyRate ? `A partir de R$ ${Number(profile.hourlyRate).toFixed(2)}` : '');
+          setCategory(profile.category || 'Elétrica');
+          setProfileLoaded(true);
+        }
       } catch (error) {
         console.error(error);
+        if (isMounted) setLoadError('Não foi possível carregar seu perfil.');
+      } finally {
+        if (isMounted) setIsLoadingProfile(false);
       }
     };
 
     loadCategories();
     loadProfile();
-  }, [currentUser?.name]);
+
+    return () => { isMounted = false; };
+  }, [currentUser?.name, retryKey]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,10 +117,10 @@ export default function PerfilEditar() {
 
     try {
       const categoryMatch = availableCategories.find((cat) => cat.name === category);
-      const categoryIds = categoryMatch ? [categoryMatch.id] : [];
       const regionParts = region.split(' - ').map((part) => part.trim()).filter(Boolean);
       const state = regionParts.length > 1 ? regionParts.at(-1) : undefined;
       const neighborhood = regionParts.length > 2 ? regionParts.slice(1, -1).join(' - ') : '';
+      const categoryIds = categoriesLoaded && categoryMatch ? [categoryMatch.id] : undefined;
 
       await apiPut('/api/provider/profile/me', {
         name: name.trim(),
@@ -82,8 +129,7 @@ export default function PerfilEditar() {
         city: regionParts[0] || '',
         neighborhood,
         state,
-        hourlyRate: Number(price.replace(/[^0-9,]/g, '').replace(',', '.')) || 0,
-        isUrgentAvailable: true,
+        hourlyRate: parseHourlyRate(price),
         categoryIds,
       });
       toast.success('Perfil atualizado com sucesso!');
@@ -119,6 +165,19 @@ export default function PerfilEditar() {
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Card className="p-6 sm:p-10 border border-border shadow-sm">
+          {isLoadingProfile && (
+            <div className="mb-6 rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+              Carregando dados do perfil...
+            </div>
+          )}
+          {!isLoadingProfile && loadError && (
+            <div className="mb-6 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              <p>{loadError}</p>
+              <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setRetryKey((current) => current + 1)}>
+                Tentar novamente
+              </Button>
+            </div>
+          )}
           <div className="flex items-center justify-between mb-8 pb-4 border-b border-border">
             <div>
               <h1 className="text-2xl font-bold text-foreground">Editar Perfil</h1>
@@ -131,19 +190,19 @@ export default function PerfilEditar() {
           <form onSubmit={handleSave} className="space-y-8">
             {/* Profile Avatar section */}
             <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 bg-muted/20 p-4 rounded-xl">
-              <Avatar className="h-20 w-20">
-                <AvatarFallback className="bg-secondary/20 text-secondary text-xl font-bold">
-                  {name.split(' ').map((n) => n[0]).join('')}
-                </AvatarFallback>
-              </Avatar>
+              <ProfilePhoto
+                name={name}
+                avatarUrl={avatarUrl}
+                className="h-20 w-20"
+                onUploaded={setAvatarUrl}
+                onRemoved={() => setAvatarUrl(null)}
+                allowRemove
+              />
               <div className="space-y-2 text-center sm:text-left">
                 <h4 className="font-semibold text-foreground text-sm">Foto de Perfil</h4>
                 <div className="flex gap-2">
-                  <Button type="button" size="sm" variant="outline">
+                  <Button type="button" size="sm" variant="outline" onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}>
                     Alterar Foto
-                  </Button>
-                  <Button type="button" size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10">
-                    Remover
                   </Button>
                 </div>
               </div>
@@ -175,7 +234,7 @@ export default function PerfilEditar() {
                         {cat.name}
                       </option>
                     )) : (
-                      <option value="Eletricista">Eletricista</option>
+                      <option value="Elétrica">Elétrica</option>
                     )}
                   </select>
                 </div>
@@ -266,9 +325,9 @@ export default function PerfilEditar() {
               <Button type="button" variant="outline" onClick={() => navigate('/dashboard')} className="px-6">
                 Cancelar
               </Button>
-              <Button type="submit" variant="secondary" className="px-6" disabled={isSaving}>
+              <Button type="submit" variant="secondary" className="px-6" disabled={isSaving || isLoadingProfile || !profileLoaded || Boolean(loadError)}>
                 <Save className="h-4 w-4 mr-2" />
-                {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+                {isSaving ? 'Salvando...' : isLoadingProfile ? 'Carregando...' : 'Salvar Alterações'}
               </Button>
             </div>
           </form>

@@ -12,14 +12,13 @@ export async function dashboardRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: 'Only providers can access this route' });
     }
 
-    const [profile, latestVerification, requests, completedThisMonth, reviews] = await Promise.all([
+    const [profile, requests, completedThisMonth, reviews] = await Promise.all([
       prisma.providerProfile.findUnique({
         where: { userId: user.sub },
-        include: { categories: { include: { category: true } } },
-      }),
-      prisma.userVerification.findFirst({
-        where: { userId: user.sub },
-        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: { avatarUrl: true } },
+          categories: { include: { category: true } },
+        },
       }),
       prisma.serviceRequest.findMany({
         where: { providerId: user.sub, status: { in: ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'] } },
@@ -56,24 +55,13 @@ export async function dashboardRoutes(app: FastifyInstance) {
     ]);
 
     return {
-      verification: latestVerification
-        ? {
-            status: latestVerification.status,
-            reviewedAt: latestVerification.reviewedAt,
-            rejectionReason: latestVerification.rejectionReason,
-          }
-        : {
-            status: 'NONE',
-            reviewedAt: null,
-            rejectionReason: null,
-          },
       setup: {
         profileReady: Boolean(profile),
-        verificationReady: latestVerification?.status === 'PENDING' || latestVerification?.status === 'APPROVED',
       },
       provider: profile
         ? {
             verified: profile.isVerified,
+            avatarUrl: profile.user.avatarUrl,
             hourlyRate: profile.hourlyRate,
             averageRating: Number(profile.averageRating),
             totalReviews: profile.totalReviews,

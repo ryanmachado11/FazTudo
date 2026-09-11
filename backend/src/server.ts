@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import { buildApp } from './app.js';
-import { validateAuthConfig } from './lib/auth.js';
+import { validateRuntimeConfig } from './lib/auth.js';
 
-validateAuthConfig();
+validateRuntimeConfig();
 const app = await buildApp();
 
 const port = Number(process.env.PORT || 3001);

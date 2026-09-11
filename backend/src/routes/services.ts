@@ -23,6 +23,13 @@ const statusSchema = z.object({
   status: z.enum(['ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
 });
 
+const updateRequestSchema = z.object({
+  categoryId: z.string().uuid(),
+  description: z.string().trim().min(10).max(5000),
+  urgencyFlag: z.boolean().optional(),
+  scheduledFor: z.string().datetime({ offset: true }).nullable().optional(),
+}).strict();
+
 export async function servicesRoutes(app: FastifyInstance) {
   app.get('/', { preHandler: requireAuth }, async (request, reply) => {
     const user = request.user;
@@ -47,6 +54,7 @@ export async function servicesRoutes(app: FastifyInstance) {
         providerId: true,
         status: true,
         description: true,
+        urgencyFlag: true,
         scheduledFor: true,
         createdAt: true,
         client: { select: { name: true } },
@@ -68,6 +76,7 @@ export async function servicesRoutes(app: FastifyInstance) {
       categoryName: service.category.name,
       status: service.status,
       description: service.description,
+      urgencyFlag: service.urgencyFlag,
       scheduledFor: service.scheduledFor,
       createdAt: service.createdAt,
       hasReview: service._count.reviews > 0,
@@ -98,7 +107,6 @@ export async function servicesRoutes(app: FastifyInstance) {
         where: { userId: providerId },
         select: {
           isUrgentAvailable: true,
-          isVerified: true,
           user: { select: { role: true, isActive: true } },
           categories: {
             select: { categoryId: true, category: { select: { isActive: true } } },
@@ -108,10 +116,6 @@ export async function servicesRoutes(app: FastifyInstance) {
 
       if (!provider || provider.user.role !== 'PROVIDER' || !provider.user.isActive) {
         return reply.code(404).send({ error: 'Provider not found' });
-      }
-
-      if (!provider.isVerified) {
-        return reply.code(403).send({ error: 'Provider is not verified yet' });
       }
 
       if (urgencyFlag && !provider.isUrgentAvailable) {
@@ -154,6 +158,83 @@ export async function servicesRoutes(app: FastifyInstance) {
     });
 
     return reply.code(201).send({ service });
+  });
+
+  app.patch('/:id', { preHandler: requireAuth }, async (request, reply) => {
+    const parsedParams = paramsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.code(400).send({ error: 'Invalid service id' });
+    }
+
+    const parsedBody = updateRequestSchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.code(400).send({ error: 'Invalid payload', issues: parsedBody.error.flatten() });
+    }
+
+    const user = request.user;
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+    if (user.role !== 'CLIENT') {
+      return reply.code(403).send({ error: 'Only clients can edit services' });
+    }
+
+    const service = await prisma.serviceRequest.findUnique({
+      where: { id: parsedParams.data.id },
+      select: { id: true, clientId: true, providerId: true, status: true },
+    });
+    if (!service) return reply.code(404).send({ error: 'Service request not found' });
+    if (service.clientId !== user.sub) {
+      return reply.code(403).send({ error: 'You do not have access to this service request' });
+    }
+    if (service.status !== 'REQUESTED') {
+      return reply.code(409).send({ error: 'Only requested services can be edited' });
+    }
+
+    const { categoryId, description, urgencyFlag = false, scheduledFor } = parsedBody.data;
+    const category = await prisma.category.findFirst({
+      where: { id: categoryId, isActive: true },
+      select: { id: true },
+    });
+    if (!category) return reply.code(404).send({ error: 'Category not found' });
+
+    if (service.providerId) {
+      const provider = await prisma.providerProfile.findUnique({
+        where: { userId: service.providerId },
+        select: {
+          isUrgentAvailable: true,
+          user: { select: { role: true, isActive: true } },
+          categories: {
+            select: { categoryId: true, category: { select: { isActive: true } } },
+          },
+        },
+      });
+      if (!provider || provider.user.role !== 'PROVIDER' || !provider.user.isActive) {
+        return reply.code(404).send({ error: 'Provider not found' });
+      }
+      if (urgencyFlag && !provider.isUrgentAvailable) {
+        return reply.code(409).send({ error: 'Provider is not available for urgent requests' });
+      }
+      const offersCategory = provider.categories.some(
+        (entry) => entry.categoryId === categoryId && entry.category.isActive,
+      );
+      if (!offersCategory) {
+        return reply.code(400).send({ error: 'Provider does not offer this category' });
+      }
+    }
+
+    const updated = await prisma.serviceRequest.updateMany({
+      where: { id: service.id, clientId: user.sub, status: 'REQUESTED' },
+      data: {
+        categoryId,
+        description,
+        urgencyFlag,
+        scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
+      },
+    });
+    if (updated.count !== 1) {
+      return reply.code(409).send({ error: 'Service status changed; reload and try again' });
+    }
+
+    return { service: await prisma.serviceRequest.findUnique({ where: { id: service.id } }) };
   });
 
   app.patch('/:id/status', { preHandler: requireAuth }, async (request, reply) => {

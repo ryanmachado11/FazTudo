@@ -43,7 +43,7 @@ export default function Privacidade() {
             <section className="space-y-3">
               <h2 className="text-xl font-semibold text-foreground">1. Informações que Coletamos</h2>
               <p>
-                Coletamos informações cadastrais fornecidas diretamente por você ao criar uma conta, tais como nome completo, endereço de e-mail, número de telefone e dados de perfil. Para prestadores de serviço, coletamos também documentos de identificação (RG, CPF e comprovante de residência) e fotos (selfie) necessários para a verificação de segurança.
+                Coletamos informações cadastrais fornecidas diretamente por você ao criar uma conta, tais como nome completo, endereço de e-mail, número de telefone e dados de perfil. Esses dados básicos de cadastro e contato podem ser utilizados para confirmar e apresentar as informações do prestador na plataforma.
               </p>
             </section>
 
@@ -54,7 +54,7 @@ export default function Privacidade() {
               </p>
               <ul className="list-disc list-inside pl-4 space-y-1">
                 <li>Facilitar a comunicação entre clientes e prestadores no chat;</li>
-                <li>Validar a identidade de prestadores (selo de verificação);</li>
+                <li>Confirmar os dados básicos de cadastro e contato dos prestadores;</li>
                 <li>Garantir a segurança e integridade de nossa comunidade;</li>
                 <li>Enviar avisos administrativos, alertas de serviços e suporte técnico.</li>
               </ul>
@@ -70,7 +70,7 @@ export default function Privacidade() {
             <section className="space-y-3">
               <h2 className="text-xl font-semibold text-foreground">4. Segurança dos Dados</h2>
               <p>
-                Adotamos medidas técnicas e administrativas compatíveis com os padrões do mercado para proteger seus dados pessoais contra perda, roubo, acesso não autorizado, alteração ou destruição. Seus dados de documentos enviados para validação são armazenados de forma criptografada.
+                Adotamos medidas técnicas e administrativas compatíveis com os padrões do mercado para proteger seus dados pessoais contra perda, roubo, acesso não autorizado, alteração ou destruição. Os dados cadastrais e de contato são protegidos de acordo com as medidas de segurança aplicáveis à plataforma.
               </p>
             </section>
 

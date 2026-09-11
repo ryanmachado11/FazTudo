@@ -1,17 +1,21 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
-import { Avatar, AvatarFallback } from '../components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { 
   Search, Zap, Droplet, Box, Star, MapPin, Clock, ShieldCheck, MessageCircle, Wrench, AlertCircle, 
   Sparkles, Wind, Shield, Truck, Construction, Flame, Layers, Maximize2, Armchair, Tv, Wifi, Waves, 
-  Bug, LayoutGrid, Paintbrush, Hammer, TreePine, ChevronLeft, ChevronRight, X, Filter, Flame as PopularIcon
+  Bug, LayoutGrid, Paintbrush, Hammer, TreePine, ChevronLeft, ChevronRight, X, Filter, Flame as PopularIcon, LogOut
 } from 'lucide-react';
 import { serviceCategories, ServiceCategory } from '../lib/categoriesData';
 import { apiGet } from '../lib/api';
+import { getCurrentUser } from '../lib/session';
+import { clearSession } from '../lib/session';
+import { useAuth } from '../hooks/useAuth';
+import { ProfilePhoto } from '../components/ProfilePhoto';
 
 // Map iconName strings to Lucide Icon Components
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -42,24 +46,39 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 const popularSearches = ['Pintor', 'Eletricista', 'Vazamento', 'Ar-Condicionado', 'Montador', 'Fechadura'];
 
 export default function ClientHome() {
+  const navigate = useNavigate();
+  const { user: authenticatedUser } = useAuth();
+  const currentUser = authenticatedUser || getCurrentUser();
+  const [uploadedAvatarUrl, setUploadedAvatarUrl] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<any | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [backendProviders, setBackendProviders] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [isLoadingProviders, setIsLoadingProviders] = useState(true);
+  const [providersError, setProvidersError] = useState('');
+  const [providersRetryKey, setProvidersRetryKey] = useState(0);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let isMounted = true;
+    setIsLoadingProviders(true);
+    setProvidersError('');
+
     Promise.allSettled([apiGet<any[]>('/api/providers'), apiGet<any[]>('/api/categories')]).then((results) => {
       if (!isMounted) return;
-      if (results[0].status === 'fulfilled') setBackendProviders(results[0].value);
+      if (results[0].status === 'fulfilled') {
+        setBackendProviders(results[0].value);
+      } else {
+        setProvidersError('Não foi possível carregar os profissionais.');
+      }
       if (results[1].status === 'fulfilled') setCategories(results[1].value);
+      setIsLoadingProviders(false);
     });
     return () => { isMounted = false; };
-  }, []);
+  }, [providersRetryKey]);
 
   const handleScroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
@@ -119,6 +138,11 @@ export default function ClientHome() {
 
   const hasActiveFilters = searchTerm !== '' || selectedCategory !== null || selectedSubcategory !== null;
 
+  const handleLogout = () => {
+    clearSession();
+    navigate('/login', { replace: true });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -130,10 +154,16 @@ export default function ClientHome() {
               <span className="text-xl font-bold text-foreground">FazTudo+</span>
             </Link>
             <div className="flex items-center gap-3">
-              <Link to="/servicos">
+              <Link to={currentUser?.role === 'PROVIDER' ? '/dashboard' : '/servicos'}>
                 <Button variant="ghost" size="sm" className="font-medium">
-                  <span className="hidden sm:inline">Meus serviços</span>
-                  <span className="sm:hidden">Serviços</span>
+                  {currentUser?.role === 'PROVIDER' ? (
+                    <span>Painel</span>
+                  ) : (
+                    <>
+                      <span className="hidden sm:inline">Meus serviços</span>
+                      <span className="sm:hidden">Serviços</span>
+                    </>
+                  )}
                 </Button>
               </Link>
               <Link to="/mensagens">
@@ -142,9 +172,16 @@ export default function ClientHome() {
                   <span className="hidden sm:inline">Mensagens</span>
                 </Button>
               </Link>
-              <Avatar className="h-9 w-9 cursor-pointer border border-border">
-                <AvatarFallback className="bg-secondary text-secondary-foreground font-semibold">MC</AvatarFallback>
-              </Avatar>
+              <ProfilePhoto
+                name={currentUser?.name || 'Cliente'}
+                avatarUrl={uploadedAvatarUrl || currentUser?.avatarUrl}
+                className="h-9 w-9 border border-border"
+                onUploaded={setUploadedAvatarUrl}
+              />
+              <Button type="button" variant="ghost" size="sm" className="flex items-center gap-1.5" onClick={handleLogout}>
+                <LogOut className="h-4 w-4" />
+                <span className="hidden sm:inline">Sair</span>
+              </Button>
             </div>
           </div>
         </div>
@@ -157,7 +194,7 @@ export default function ClientHome() {
             Encontre o profissional ideal
           </h1>
           <p className="text-muted-foreground text-sm">
-            Profissionais verificados, capacitados e avaliados perto de você
+            Profissionais com dados cadastrais confirmados, capacitados e avaliados perto de você
           </p>
         </div>
 
@@ -320,7 +357,7 @@ export default function ClientHome() {
               </Button>
 
               {/* Dynamic Category Pills with Icons */}
-              {(categories.length > 0 ? categories : serviceCategories.slice(0, 3)).map((cat) => {
+              {(categories.length > 0 ? categories : serviceCategories).map((cat) => {
                 const matchedStatic = serviceCategories.find(
                   (sc) =>
                     sc.name.toLowerCase() === cat.name.toLowerCase() ||
@@ -431,7 +468,19 @@ export default function ClientHome() {
             )}
           </div>
 
-          {filteredProfessionals.length === 0 ? (
+          {isLoadingProviders ? (
+            <Card className="p-12 text-center border-dashed border-2">
+              <p className="text-muted-foreground">Carregando profissionais...</p>
+            </Card>
+          ) : providersError ? (
+            <Card className="p-12 text-center border-dashed border-2">
+              <h3 className="text-lg font-semibold text-foreground mb-1">Não foi possível carregar os profissionais</h3>
+              <p className="text-sm text-muted-foreground mb-4">Verifique sua conexão e tente novamente.</p>
+              <Button variant="secondary" onClick={() => setProvidersRetryKey((current) => current + 1)}>
+                Tentar novamente
+              </Button>
+            </Card>
+          ) : filteredProfessionals.length === 0 ? (
             <Card className="p-12 text-center border-dashed border-2">
               <div className="bg-muted/50 rounded-full h-16 w-16 flex items-center justify-center mx-auto mb-4">
                 <Search className="h-8 w-8 text-muted-foreground" />
@@ -452,6 +501,7 @@ export default function ClientHome() {
                     {/* Avatar */}
                     <div className="flex-shrink-0">
                       <Avatar className="h-20 w-20 border-2 border-secondary/20">
+                        {prof.avatarUrl && <AvatarImage src={prof.avatarUrl} alt={`Foto de ${prof.name}`} />}
                         <AvatarFallback className="bg-secondary/20 text-secondary text-lg font-bold">
                           {prof.name.split(' ').map((n: string) => n[0]).join('')}
                         </AvatarFallback>

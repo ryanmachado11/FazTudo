@@ -1,154 +1,179 @@
 # FazTudo+ — Especificação do Back-End & Arquitetura de Segurança
 
-Aja como um **ENGENHEIRO DE SOFTWARE PRINCIPAL** e **ESPECIALISTA EM CIBERSEGURANÇA** com vasta experiência em:
-- Arquitetura de APIs RESTful escaláveis (Node.js/TypeScript)
-- Banco de Dados Relacional otimizado (MySQL 8.0+)
-- Conteinerização e Orchestration básica (Docker & Docker Compose)
-- Segurança da Informação (OWASP Top 10, LGPD, Criptografia, Auth Zero-Trust)
-- Sistemas de mensageria em tempo real e WebSockets
-- Plataformas de Marketplace e Gestão de Identidade/Verificação
-
-Este repositório atual contém apenas o front-end React/Vite/Tailwind do FazTudo+. Não existe backend implementado aqui. Portanto, o objetivo é criar um serviço backend separado, preferencialmente em `backend/` ou `api/`, que exponha APIs compatíveis com o fluxo da UI já existente.
-
-### Observação importante:
-- Use a interface e telas atuais como contexto funcional e de domínio.
-- Não assuma existência de controllers, services ou modelos backend no repositório.
-- Preserve a arquitetura front-end existente; altere o front-end apenas quando necessário para conectar ao backend local.
-- O backend deve ser desenvolvido como um serviço modular, integrado ao frontend via `http://localhost:PORT/api/...`.
-
-Seu objetivo é implementar o **BACK-END COMPLETO E ULTRA-SEGURO** da plataforma **FazTudo+**, garantindo total integração com as telas e componentes definidos no Design System / Figma.
+> **Serviço de Back-end RESTful:** Localizado no diretório `backend/`  
+> **Tecnologias Centrais:** Node.js (TypeScript), Fastify v5, Prisma ORM v6, MySQL 8.0, Docker & Docker Compose  
 
 ---
 
-# 1. VISÃO GERAL DO PROJETO & DIRETRIZES DE SEGURANÇA
+## 1. Visão Geral da Arquitetura do Back-End
 
-O FazTudo+ conecta clientes e prestadores de serviços locais no Brasil. Por lidar com acesso a residências, dados pessoais sensíveis (documentos, selfies, geolocalização) e transações, **A SEGURANÇA É O PILAR CENTRAL DA APLICAÇÃO**.
+O back-end do **FazTudo+** foi desenvolvido como uma API RESTful modular, segura e de alta performance, estruturada para atender aos fluxos de clientes e prestadores autônomos de serviços residenciais.
 
-### Diretrizes Inegociáveis de Engenharia:
-* **Segurança por Design (Security by Design):** Validação, saneamento e tipagem rigorosa de todas as entradas.
-* **Conformidade com a LGPD:** Criptografia de Dados Pessoais Sensíveis (PII) em repouso (*at-rest*) e em trânsito (*in-transit*).
-* **Simplicidade e Performance:** Arquitetura limpa (Clean Architecture / Layered Architecture) com foco em baixa latência.
-* **Observabilidade:** Logs estruturados, tratamento global de erros e health check de serviço.
-
----
-
-# 2. STACK TECNOLÓGICA OBRIGATÓRIA
-
-* **Ambiente de Execução:** Node.js (Versão LTS / Node 20+) com **TypeScript** (estritamente tipado).
-* **Framework Web:** Fastify (preferido) com Zod ou TypeBox para validação de schemas.
-* **Banco de Dados:** MySQL 8.0+.
-* **ORM / Query Builder:** Prisma ORM com migrations e seed scripts.
-* **Autenticação e Sessões:** JWT (RSA256 ou HMAC-SHA256), cookies `HttpOnly`, `Secure`, `SameSite=Strict`, refresh tokens rotativos e revogação segura.
-* **Mensageria / Chat:** Socket.io ou WebSockets nativo com autenticação de handshake por token.
-* **Infraestrutura:** Docker & Docker Compose para app, MySQL e Redis.
+A arquitetura adota o princípio de **Defesa em Profundidade** e **Security by Design**, garantindo:
+* Isolamento de permissões por perfil de usuário (`CLIENT`, `PROVIDER`, `ADMIN`).
+* Criptografia moderna de senhas e autenticação de curta duração baseada em tokens JWT.
+* Prevenção contra vulnerabilidades comuns da web (OWASP Top 10), tais como IDOR, injeção de comandos/SQL e ataques de força bruta.
+* Canal de comunicação privativo e seguro via **Chat Interno** com controle de leitura.
 
 ---
 
-# 3. REQUISITOS RIGOROSOS DE CIBERSEGURANÇA (OWASP TOP 10 & LGPD)
+## 2. Stack Tecnológica do Back-End
 
-Você deve aplicar rigorosamente as seguintes camadas de defesa no código:
-
-### 3.1. Autenticação & Gestão de Acesso (Broken Access Control & Auth)
-1.  **Hash de Senhas:** Utilizar obrigatoriamente **Argon2id** ou **Bcrypt** (cost factor mínimo 12).
-2.  **RBAC (Role-Based Access Control):** Controle de acesso baseado em papéis (`CLIENTE`, `PRESTADOR`, `ADMIN`). Usuários comuns jamais podem acessar endpoints administrativos ou dados de outros usuários.
-3.  **Proteção IDOR (Insecure Direct Object References):** Garantir que um cliente só consiga visualizar/modificar seus próprios chats, agendamentos e dados de perfil. Utilizar **UUIDv4** para chaves primárias expostas em rotas públicas/APIs.
-
-### 3.2. Proteção contra Injeção e Manipulação de Dados
-1.  **SQL Injection:** Uso obrigatório de *Prepared Statements* via ORM. Consultas SQL puras estão proibidas sem higienização explicita.
-2.  **XSS & Sanitização:** Higienizar todas as entradas de texto (especialmente mensagens no chat e comentários de avaliações) para impedir a execução de código malicioso.
-
-### 3.3. Proteção de Infraestrutura e Redes
-1.  **Rate Limiting & Anti-DDoS:** Implementar limite de requisições por IP/Usuário com Redis (ex.: 5 tentativas de login por minuto, 60 requisições por minuto na API).
-2.  **Headers de Segurança (Helmet):** CORS restrito, CSP, HSTS, X-Content-Type-Options, X-Frame-Options e Referrer-Policy.
-3.  **Upload Seguro de Arquivos:**
-    * Validação de tipo MIME real (magic numbers), extensão e tamanho máximo.
-    * Renomeação aleatória de arquivos e armazenamento seguro fora da raiz pública.
-    * Preferir URLs pré-assinadas temporárias para downloads de mídia.
-4.  **Proteção de Payload:** Limitar o tamanho máximo de requisição e aplicar timeouts adequados.
+* **Ambiente de Execução:** Node.js 20+ / Node 26 (LTS) com **TypeScript** e módulos ECMAScript (`NodeNext`).
+* **Framework Web:** **Fastify v5** — roteamento de alta performance com tipagem nativa e baixo consumo de memória.
+* **Validação de Schemas:** **Zod** — validação estrita em todas as entradas de dados (`.strict()`), com tipagem estática inferida e saneamento de payloads.
+* **ORM e Acesso a Dados:** **Prisma ORM v6** — mapeamento objeto-relacional estrito, migrações automatizadas e queries seguras com prepared statements.
+* **Banco de Dados:** **MySQL 8.0** — transações ACID, chaves estrangeiras com ações em cascata/restrição e índices secundários.
+* **Criptografia e Hashing:** **Argon2id** (v=19, m=65536, p=4, t=3) para senhas; **jsonwebtoken** para tokens JWT.
+* **Conteinerização:** Docker com Docker Compose (serviço `app` em multi-stage build e serviço `mysql:8.0` com healthcheck dedicado).
 
 ---
 
-# 4. MODELAGEM DO BANCO DE DADOS (SCHEMA MYSQL)
+## 3. Segurança da Informação (OWASP Top 10 & Boas Práticas)
 
-Crie o modelo de dados em MySQL considerando os requisitos das telas da interface. O banco deve conter, no mínimo, as seguintes tabelas e relacionamentos:
+### 3.1. Autenticação e Gestão de Sessões
+1. **Hash Seguro com Argon2id:** Senhas armazenadas com função de derivação de chave de memória difícil, resistente a ataques acelerados por GPU/ASIC.
+2. **Mitigação de Timing Attacks:** Em tentativas de login com e-mail inexistente, a aplicação calcula um hash Argon2id simulado antes de responder, impedindo enumeração de usuários por diferença no tempo de resposta da API.
+3. **Tokens JWT com Assinatura HMAC-SHA256:**
+   * Expiração configurada para 15 minutos (`exp: 15m`).
+   * Validação de emissor (`iss: faztudo-api`) e público-alvo (`aud: faztudo-web`).
+   * Transmissão via cabeçalho HTTP padrão `Authorization: Bearer <token>`.
 
-### 4.1. Módulo de Usuários e Autenticação
-* `users`: `id` (UUID), `name`, `email` (unique), `phone` (unique), `password_hash`, `role` (ENUM: 'CLIENT', 'PROVIDER', 'ADMIN'), `avatar_url`, `is_active`, `created_at`, `updated_at`.
-* `user_verifications`: ID, `user_id`, `document_type` (CPF/CNH), `document_number_encrypted`, `document_front_url`, `document_back_url`, `selfie_url`, `status` (ENUM: 'PENDING', 'APPROVED', 'REJECTED'), `rejection_reason`, `reviewed_at`.
+### 3.2. Controle de Acesso e Prevenção contra IDOR
+1. **Role-Based Access Control (RBAC):** Os papéis `CLIENT` e `PROVIDER` possuem escopos rigorosamente delimitados:
+   * Somente `PROVIDER` pode acessar `/api/provider/dashboard` e gerenciar o perfil profissional.
+   * Somente `CLIENT` pode criar avaliações e editar solicitações de serviço pendentes.
+2. **Prevenção a Acesso Direto a Objetos Inseguros (IDOR):**
+   * Todas as entidades públicas utilizam identificadores universais únicos (**UUID v4**), impedindo adivinhação de registros por sequência incremental.
+   * Endpoints de chat (`/api/chat/rooms`, `/api/chat/rooms/:id/messages`, `/api/chat/rooms/:id/read`, `/api/chat/messages`) validam expressamente se o usuário autenticado é o cliente ou o prestador vinculado àquela conversa antes de fornecer qualquer informação ou permitir envio de mensagens.
 
-### 4.2. Módulo de Categorias e Prestadores (Foco no MVP)
-* `categories`: ID, `name` (*Restrito ao MVP: "Eletricista", "Encanador", "Montador de Móveis"*), `slug`, `icon_url`, `is_active`.
-* `provider_profiles`: ID, `user_id` (FK), `bio`, `city`, `neighborhood`, `state`, `is_verified` (Boolean), `hourly_rate`, `average_rating` (Decimal), `total_reviews` (Int), `is_urgent_available` (Boolean - para o botão de Urgência da Home).
-* `provider_categories`: Relacionamento N:M entre `provider_profiles` e `categories`.
+### 3.3. Proteção contra Injeção e Manipulação de Dados
+1. **Injeção de SQL:** Todo o acesso à base de dados é mediado pelas APIs do Prisma Client, garantindo o uso de consultas preparadas parametrizadas.
+2. **Saneamento de Strings e URLs:** O schema do Zod higieniza campos de texto com `.trim()` e restringe comprimentos máximos. Links de mídia no chat devem seguir protocolo HTTPS obrigatório.
 
-### 4.3. Módulo de Serviços, Agendamentos e Dashboard
-* `service_requests`: ID (UUID), `client_id` (FK), `provider_id` (FK), `category_id` (FK), `status` (ENUM: 'REQUESTED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'), `description`, `urgency_flag` (Boolean), `scheduled_for`, `created_at`.
-* `provider_metrics`: Tabela/view agregada para o Dashboard do Prestador (ganhos acumulados, agenda do dia, pedidos pendentes).
-
-### 4.4. Módulo de Comunicação em Tempo Real (Chat)
-* `chat_rooms`: ID (UUID), `service_request_id` (FK), `client_id` (FK), `provider_id` (FK), `created_at`.
-* `chat_messages`: ID (UUID), `room_id` (FK), `sender_id` (FK), `message_type` (ENUM: 'TEXT', 'IMAGE', 'AUDIO', 'PROPOSAL'), `content` (ou media_url), `is_read` (Boolean), `created_at`.
-
-### 4.5. Módulo de Avaliações e Confiança
-* `reviews`: ID (UUID), `service_request_id` (FK), `client_id` (FK), `provider_id` (FK), `rating` (SmallInt 1 a 5), `comment` (Text), `created_at`. *(Restrição: Um cliente só pode avaliar se o status do serviço for 'COMPLETED').*
-
----
-
-# 5. ENDPOINTS E REGRAS DE NEGÓCIO DA API
-
-Implemente os endpoints seguindo o padrão REST:
-
-### Auth & Perfil
-* `POST /api/auth/register` — Cadastro de usuário (Validação estrita de e-mail e CPF brasileiro).
-* `POST /api/auth/login` — Autenticação com retorno de JWT e Cookies Seguros.
-* `POST /api/provider/profile/me` — Criação e atualização do perfil do prestador.
-
-### Cliente & Busca (Home / Perfil Prestador)
-* `GET /api/categories` — Listagem do escopo do MVP.
-* `GET /api/providers` — Filtros por categoria, localização, ordenar por nota e flag de "Atende Urgência".
-* `GET /api/providers/:id` — Dados completos do prestador, selo de verificação, estatísticas e listagem de comentários.
-
-### Chat & Serviços
-* `POST /api/services` — Criar solicitação de serviço/orçamento.
-* `GET /api/chat/rooms` — Listar conversas ativas.
-* `GET /api/chat/rooms/:id/messages` — Histórico de mensagens.
-* *WebSocket Handshake:* Eventos para `send_message`, `receive_message`, `send_proposal`, `typing`.
-
-### Dashboard do Prestador
-* `GET /api/provider/dashboard` — Resumo de ganhos, lista de pedidos recebidos, solicitações urgentes e métricas gerais.
-
-### Avaliações
-* `POST /api/reviews` — Criar avaliação (Atualiza atomicamente o `average_rating` do prestador dentro de uma transação de banco de dados).
+### 3.4. Rate Limiting e Proteção de Rede
+1. **Rate Limiter por Janela Deslizante:** Middleware em memória (`rate-limit.ts`) limitando requisições por IP e endpoint:
+   * Cadastro: máximo de 5 tentativas por hora.
+   * Login: máximo de 10 tentativas a cada 15 minutos.
+   * Envio de mensagens no chat: máximo de 30 mensagens por minuto.
+2. **Cabeçalhos de Segurança:** Configurados no hook `onSend` do Fastify:
+   * `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`
+   * `X-Frame-Options: DENY`
+   * `X-Content-Type-Options: nosniff`
+   * `Referrer-Policy: no-referrer`
+   * `Cross-Origin-Resource-Policy: same-site`
+   * `Cache-Control: no-store` para rotas privadas de dados e controle de cache para catálogo público.
 
 ---
 
-# 6. CONFIGURAÇÃO DO AMBIENTE DOCKER
+## 4. Modelagem do Banco de Dados (Schema Relacional)
 
-Disponibilize um arquivo `docker-compose.yml` contendo:
-1.  **Container App (Node.js API):** Multi-stage build otimizado para produção.
-2.  **Container MySQL 8.0:** Com volume persistente para os dados e script SQL inicial de seeds (populando as 3 categorias do MVP).
-3.  **Container Redis:** Para gestão de sessões, cache e rate-limiting.
-4.  **Rede Interna Isolada:** Apenas o container da App expõe a porta web para o host; o MySQL e o Redis permanecem inacessíveis externamente.
+O banco de dados relacional é estruturado pelas seguintes tabelas principais:
+
+### 4.1. `users`
+* `id` (VARCHAR 36, UUID, PK)
+* `name` (VARCHAR 255)
+* `email` (VARCHAR 255, UNIQUE)
+* `phone` (VARCHAR 50, UNIQUE)
+* `password_hash` (VARCHAR 255)
+* `role` (ENUM: 'CLIENT', 'PROVIDER', 'ADMIN')
+* `avatar_url` (LONGTEXT — dados de imagem codificados em base64)
+* `is_active` (BOOLEAN, default: true)
+* `created_at` / `updated_at` (DATETIME)
+
+### 4.2. `categories` e `provider_categories`
+* `categories`: `id`, `name`, `slug` (UNIQUE), `icon_url`, `is_active`.
+* `provider_categories`: tabela de junção N:M entre `provider_profiles` e `categories` com chave composta `(provider_profile_id, category_id)`.
+
+### 4.3. `provider_profiles`
+* `id` (VARCHAR 36, UUID, PK)
+* `user_id` (VARCHAR 36, UNIQUE, FK -> `users.id`)
+* `bio` (TEXT)
+* `specialties` (JSON)
+* `city` / `neighborhood` / `state` (VARCHAR)
+* `hourly_rate` (DECIMAL 10,2)
+* `average_rating` (DECIMAL 3,2)
+* `total_reviews` (INT, default: 0)
+* `is_urgent_available` (BOOLEAN, default: false)
+* `is_verified` (BOOLEAN, default: false)
+
+### 4.4. `service_requests`
+* `id` (VARCHAR 36, UUID, PK)
+* `client_id` (FK -> `users.id`)
+* `provider_id` (FK -> `users.id`, nullable)
+* `category_id` (FK -> `categories.id`)
+* `status` (ENUM: `'REQUESTED'`, `'ACCEPTED'`, `'IN_PROGRESS'`, `'COMPLETED'`, `'CANCELLED'`)
+* `description` (TEXT)
+* `urgency_flag` (BOOLEAN, default: false)
+* `scheduled_for` (DATETIME, nullable)
+* `created_at` / `updated_at` (DATETIME)
+
+### 4.5. `chat_rooms` e `chat_messages`
+* `chat_rooms`: `id` (UUID, PK), `service_request_id` (FK, nullable), `client_id` (FK), `provider_id` (FK), `created_at`.
+* `chat_messages`: `id` (UUID, PK), `room_id` (FK), `sender_id` (FK), `message_type` (ENUM: `'TEXT'`, `'IMAGE'`, `'AUDIO'`, `'PROPOSAL'`), `content` (TEXT), `is_read` (BOOLEAN, default: false), `created_at`.
+
+### 4.6. `reviews`
+* `id` (UUID, PK)
+* `service_request_id` (UNIQUE, FK -> `service_requests.id`)
+* `client_id` (FK -> `users.id`)
+* `provider_id` (FK -> `users.id`)
+* `rating` (SMALLINT, 1 a 5)
+* `comment` (TEXT, nullable)
+* `status` (ENUM: `'PENDING'`, `'APPROVED'`, `'REJECTED'`, default: `'APPROVED'`)
+* `created_at` (DATETIME)
 
 ---
 
-# 7. ENTREGÁVEIS ESPERADOS
+## 5. Catálogo de Endpoints da API
 
-Como Engenheiro de Software, você deverá gerar:
-1.  **Código Fonte Modular:** Estruturado em camadas (`controllers`, `services`, `repositories`, `middlewares`, `models`) dentro de um novo módulo backend (`backend/` ou `api/`).
-2.  **Arquivo `.env.example`:** Declarando variáveis para segredos, chaves JWT e configurações de banco sem expor credenciais reais.
-3.  **Arquivo `docker-compose.yml`:** Pronto para executar via `docker compose up --build`, com `backend`, `mysql` e `redis`.
-4.  **Documentação de API (Swagger/OpenAPI):** Detalhando esquemas de requisição, resposta e erros padronizados.
-5.  **Integração front-end mínima:** Se necessário, apenas ajustes de configuração para apontar o front-end para o backend local, sem reestruturar a aplicação existente.
-6.  **Migrations e seeds:** Prisma migrations e seed das categorias MVP.
-7.  **Health check e logs:** Endpoint de saúde, logs estruturados e tratamento global de erros.
+Todas as rotas da API são prefixadas com `/api`:
 
-Construa um código defensivo, eficiente, limpo e totalmente pronto para suportar o ecossistema mobile-first do **FazTudo+**!
+### Autenticação & Perfil (`/api/auth`)
+* `POST /api/auth/register` — Cadastra cliente ou prestador (com perfil profissional associado). Não requer e não processa documentos oficiais (sem RG/CPF).
+* `POST /api/auth/login` — Autenticação com e-mail e senha, retornando token JWT e objeto do usuário autenticado.
+* `GET /api/auth/me` — Retorna dados da sessão e perfil do usuário logado (requer JWT).
+* `POST /api/auth/avatar` — Atualiza a foto de perfil do usuário em base64 (requer JWT).
 
-# 8. PROMPT DE EXEMPLO
+### Categorias & Prestadores (`/api/categories`, `/api/providers`)
+* `GET /api/categories` — Lista as categorias de serviços ativas.
+* `GET /api/providers` — Busca prestadores com filtros por categoria (`category`), cidade (`city`), atendimento urgente (`urgent=true`) e ordenação (`sort=rating` ou `sort=price`).
+* `GET /api/providers/:id` — Dados detalhados do prestador, especialidades, média de avaliações e comentários aprovados.
 
-Como Engenheiro de Software e CyberSegurança, você deve notar que as rotas citadas, por exemplo, não necessariamente existem. Logo, adapte-se para caso aja algumas incongruências para buscar um melhor código. Sempre leve como base o projeto já criado.
+### Gestão de Serviços (`/api/services`)
+* `GET /api/services` — Lista solicitações do usuário (como cliente ou prestador).
+* `POST /api/services` — Cria nova solicitação de serviço/orçamento (estado inicial: `REQUESTED`).
+* `PATCH /api/services/:id` — Edita detalhes da solicitação (permitido apenas para o cliente e enquanto o status for `REQUESTED`).
+* `PATCH /api/services/:id/status` — Atualiza o status do serviço respeitando a máquina de estados (ex.: prestador aceita, inicia ou conclui; cliente ou prestador cancela).
 
-# 9. LONGEVIDADE
+### Chat Interno (`/api/chat`)
+* `POST /api/chat/rooms` — Abre ou recupera uma sala de conversa entre cliente e prestador.
+* `GET /api/chat/rooms` — Lista as conversas ativas do usuário com última mensagem e contagem de mensagens não lidas (`unreadCount`).
+* `GET /api/chat/rooms/:id/messages` — Histórico ordenado de mensagens da sala.
+* `POST /api/chat/rooms/:id/read` — Marca como lidas (`isRead: true`) todas as mensagens recebidas na sala.
+* `POST /api/chat/messages` — Envia mensagem no chat (protegido por autenticação, IDOR check e rate limit).
 
-Como Engenheiro de Software e CyberSegurança, você deve escrever um código limpo e de fácil leitura e manutenção. Podera haver mudanças no código, como adição de trabalhos, por exemplo. Logo, crie um código de fácil inserção de novas funcionalidades.
+### Avaliações (`/api/reviews`)
+* `POST /api/reviews` — Emite avaliação (nota de 1 a 5 e comentário). Só é permitida para serviços concluídos (`COMPLETED`). Atualiza a média do prestador via transação serializável.
+
+### Painel do Prestador (`/api/provider/dashboard`)
+* `GET /api/provider/dashboard` — Resumo de solicitações pendentes, serviços em andamento, concluídos no mês e avaliações recentes.
+
+### Perfil do Prestador (`/api/provider/profile`)
+* `GET /api/provider/profile/me` — Recupera dados completos do perfil profissional do prestador autenticado.
+* `PUT /api/provider/profile/me` — Atualiza biografia, áreas atendidas, valor hora, especialidades e disponibilidade de emergência.
+
+---
+
+## 6. Ambiente Docker e Execução
+
+O back-end é orquestrado via `backend/docker-compose.yml`:
+
+```bash
+cd backend
+docker compose up --build
+```
+
+O ambiente inicializa automaticamente:
+1. Container `mysql` na porta interna 3306 com volume persistente `mysql-data`.
+2. Container `app` que aguarda o banco ficar saudável, aplica migrações e executa o seed de dados iniciais.
+3. API pronta para atender na porta `3001` (`http://localhost:3001/health`).

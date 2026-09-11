@@ -7,18 +7,31 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Textarea } from '../components/ui/textarea';
-import { apiGet, apiPost } from '../lib/api';
+import { apiGet, apiPatch, apiPost } from '../lib/api';
 import { getCurrentUser } from '../lib/session';
 
 type ServiceItem = {
   id: string;
   providerId: string | null;
+  categoryId: string;
   providerName: string;
   categoryName: string;
   status: string;
   description: string;
+  urgencyFlag: boolean;
+  scheduledFor: string | null;
   hasReview: boolean;
 };
+
+type CategoryItem = { id: string; name: string };
+
+function formatDateTimeLocal(value: string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 function statusLabel(status: string) {
   switch (status) {
@@ -57,9 +70,21 @@ export default function ClientServices() {
   const currentUser = getCurrentUser();
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [cancellingServiceId, setCancellingServiceId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDescription, setEditDescription] = useState('');
+  const [editCategoryId, setEditCategoryId] = useState('');
+  const [editScheduledFor, setEditScheduledFor] = useState('');
+  const [editUrgencyFlag, setEditUrgencyFlag] = useState(false);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'CLIENT') {
@@ -68,19 +93,33 @@ export default function ClientServices() {
       return;
     }
 
+    let isMounted = true;
+    setLoading(true);
+    setLoadError('');
+
     apiGet<ServiceItem[]>('/api/services')
-      .then(setServices)
-      .catch((error: any) => toast.error(error?.message || 'Não foi possível carregar seus serviços.'))
-      .finally(() => setLoading(false));
-  }, [currentUser?.id, currentUser?.role, navigate]);
+      .then((data) => {
+        if (isMounted) setServices(data);
+      })
+      .catch((error: any) => {
+        if (isMounted) setLoadError(error?.message || 'Não foi possível carregar seus serviços.');
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => { isMounted = false; };
+  }, [currentUser?.id, currentUser?.role, navigate, retryKey]);
 
   const submitReview = async (service: ServiceItem) => {
+    if (isSubmittingReview) return;
     if (!service.providerId) {
       toast.error('Este serviço não tem prestador vinculado.');
       return;
     }
 
     try {
+      setIsSubmittingReview(true);
       await apiPost('/api/reviews', {
         serviceRequestId: service.id,
         providerId: service.providerId,
@@ -96,6 +135,78 @@ export default function ClientServices() {
       toast.success('Avaliação enviada com sucesso.');
     } catch (error: any) {
       toast.error(error?.message || 'Não foi possível avaliar este serviço.');
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+  const cancelService = async (service: ServiceItem) => {
+    if (cancellingServiceId || !window.confirm('Deseja cancelar este serviço?')) return;
+
+    try {
+      setCancellingServiceId(service.id);
+      await apiPatch(`/api/services/${service.id}/status`, { status: 'CANCELLED' });
+      setServices((current) =>
+        current.map((item) => (item.id === service.id ? { ...item, status: 'CANCELLED' } : item)),
+      );
+      toast.success('Serviço cancelado com sucesso.');
+    } catch (error: any) {
+      toast.error(error?.message || 'Não foi possível cancelar o serviço.');
+    } finally {
+      setCancellingServiceId(null);
+    }
+  };
+
+  const startEditing = async (service: ServiceItem) => {
+    setEditingId(service.id);
+    setEditDescription(service.description);
+    setEditCategoryId(service.categoryId);
+    setEditScheduledFor(formatDateTimeLocal(service.scheduledFor));
+    setEditUrgencyFlag(service.urgencyFlag);
+
+    if (categories.length > 0 || isLoadingCategories) return;
+    try {
+      setIsLoadingCategories(true);
+      setCategories(await apiGet<CategoryItem[]>('/api/categories'));
+    } catch (error: any) {
+      toast.error(error?.message || 'Não foi possível carregar as categorias.');
+    } finally {
+      setIsLoadingCategories(false);
+    }
+  };
+
+  const saveEdit = async (service: ServiceItem) => {
+    if (isSavingEdit || service.status !== 'REQUESTED') return;
+    if (editDescription.trim().length < 10) {
+      toast.error('A descrição deve ter pelo menos 10 caracteres.');
+      return;
+    }
+    if (!editCategoryId) {
+      toast.error('Selecione uma categoria.');
+      return;
+    }
+
+    try {
+      setIsSavingEdit(true);
+      const updated = await apiPatch<{ service: { description: string; categoryId: string; urgencyFlag: boolean; scheduledFor: string | null } }>(
+        `/api/services/${service.id}`,
+        {
+          categoryId: editCategoryId,
+          description: editDescription.trim(),
+          urgencyFlag: editUrgencyFlag,
+          scheduledFor: editScheduledFor ? new Date(editScheduledFor).toISOString() : null,
+        },
+      );
+      const categoryName = categories.find((category) => category.id === editCategoryId)?.name || service.categoryName;
+      setServices((current) => current.map((item) => item.id === service.id
+        ? { ...item, ...updated.service, categoryName }
+        : item));
+      setEditingId(null);
+      toast.success('Serviço atualizado com sucesso.');
+    } catch (error: any) {
+      toast.error(error?.message || 'Não foi possível atualizar o serviço.');
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -124,6 +235,14 @@ export default function ClientServices() {
 
         {loading ? (
           <Card className="p-6 text-muted-foreground">Carregando serviços...</Card>
+        ) : loadError ? (
+          <Card className="p-8 text-center">
+            <h2 className="text-lg font-semibold text-foreground">Não foi possível carregar seus serviços</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Verifique sua conexão e tente novamente.</p>
+            <Button className="mt-4" variant="secondary" onClick={() => setRetryKey((current) => current + 1)}>
+              Tentar novamente
+            </Button>
+          </Card>
         ) : services.length === 0 ? (
           <Card className="p-6 text-muted-foreground">Você ainda não contratou nenhum serviço.</Card>
         ) : (
@@ -154,6 +273,21 @@ export default function ClientServices() {
                         </Button>
                       </Link>
                     )}
+                    {['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'].includes(service.status) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={cancellingServiceId === service.id}
+                        onClick={() => cancelService(service)}
+                      >
+                        {cancellingServiceId === service.id ? 'Cancelando...' : 'Cancelar'}
+                      </Button>
+                    )}
+                    {service.status === 'REQUESTED' && (
+                      <Button variant="outline" size="sm" onClick={() => startEditing(service)} disabled={isSavingEdit}>
+                        Editar
+                      </Button>
+                    )}
                     {service.status === 'COMPLETED' && !service.hasReview && (
                       <Button variant="secondary" size="sm" onClick={() => setReviewingId(service.id)}>
                         Avaliar
@@ -164,6 +298,54 @@ export default function ClientServices() {
                     )}
                   </div>
                 </div>
+
+                {editingId === service.id && (
+                  <div className="mt-4 border-t border-border pt-4 space-y-3">
+                    <Textarea
+                      value={editDescription}
+                      onChange={(event) => setEditDescription(event.target.value)}
+                      minLength={10}
+                      maxLength={5000}
+                      placeholder="Descreva o serviço"
+                      className="bg-input-background"
+                    />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <select
+                        value={editCategoryId}
+                        onChange={(event) => setEditCategoryId(event.target.value)}
+                        disabled={isLoadingCategories || isSavingEdit}
+                        className="h-10 rounded-lg border border-border bg-input-background px-3 text-sm text-foreground"
+                      >
+                        {categories.length === 0 && <option value={editCategoryId}>{service.categoryName}</option>}
+                        {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                      </select>
+                      <input
+                        type="datetime-local"
+                        value={editScheduledFor}
+                        onChange={(event) => setEditScheduledFor(event.target.value)}
+                        disabled={isSavingEdit}
+                        className="h-10 rounded-lg border border-border bg-input-background px-3 text-sm text-foreground"
+                      />
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-foreground">
+                      <input
+                        type="checkbox"
+                        checked={editUrgencyFlag}
+                        onChange={(event) => setEditUrgencyFlag(event.target.checked)}
+                        disabled={isSavingEdit}
+                      />
+                      Atendimento urgente
+                    </label>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setEditingId(null)} disabled={isSavingEdit}>
+                        Fechar
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={() => saveEdit(service)} disabled={isSavingEdit || isLoadingCategories}>
+                        {isSavingEdit ? 'Salvando...' : 'Salvar alterações'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {reviewingId === service.id && (
                   <div className="mt-4 border-t border-border pt-4 space-y-3">
@@ -190,8 +372,8 @@ export default function ClientServices() {
                       <Button variant="outline" size="sm" onClick={() => setReviewingId(null)}>
                         Cancelar
                       </Button>
-                      <Button variant="secondary" size="sm" onClick={() => submitReview(service)}>
-                        Enviar avaliação
+                      <Button variant="secondary" size="sm" disabled={isSubmittingReview} onClick={() => submitReview(service)}>
+                        {isSubmittingReview ? 'Enviando...' : 'Enviar avaliação'}
                       </Button>
                     </div>
                   </div>

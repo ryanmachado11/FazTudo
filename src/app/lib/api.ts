@@ -24,19 +24,15 @@ export class ApiError extends Error {
   }
 }
 
-function getAuthHeaders(): Record<string, string> {
-  const accessToken = getAccessToken();
-  return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-}
-
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!path.startsWith('/')) {
     throw new ApiError('Caminho de API inválido.', 0, null);
   }
 
   const url = `${API_BASE_URL}${path}`;
+  const accessToken = getAccessToken();
   const headers: Record<string, string> = {
-    ...getAuthHeaders(),
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     ...(options.headers as Record<string, string> | undefined),
   };
   if (options.body) {
@@ -77,7 +73,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       );
     }
 
-    if (response.status === 401) {
+    const isAuthEntryPoint = path === '/api/auth/login' || path === '/api/auth/register';
+    if (response.status === 401 && accessToken && !isAuthEntryPoint) {
       clearSession();
     }
 
@@ -115,4 +112,8 @@ export async function apiPatch<T>(path: string, payload: unknown): Promise<T> {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
+}
+
+export async function apiDelete<T>(path: string): Promise<T> {
+  return request<T>(path, { method: 'DELETE' });
 }

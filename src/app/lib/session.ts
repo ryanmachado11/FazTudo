@@ -5,6 +5,7 @@ export type SessionData = {
     name: string;
     email: string;
     role: string;
+    avatarUrl?: string | null;
   };
 };
 

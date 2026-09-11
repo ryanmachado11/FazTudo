@@ -20,7 +20,6 @@ export async function providersRoutes(app: FastifyInstance) {
     const { category, city, urgent, sort = 'rating', limit } = parsed.data;
     const where: any = {
       user: { role: 'PROVIDER', isActive: true },
-      isVerified: true,
     };
 
     if (category) {
@@ -38,7 +37,7 @@ export async function providersRoutes(app: FastifyInstance) {
     const providers = await prisma.providerProfile.findMany({
       where,
       select: {
-        user: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, avatarUrl: true } },
         averageRating: true,
         bio: true,
         city: true,
@@ -60,6 +59,7 @@ export async function providersRoutes(app: FastifyInstance) {
     return providers.map((provider: any) => ({
       id: provider.user.id,
       name: provider.user.name,
+      avatarUrl: provider.user.avatarUrl,
       category: provider.categories[0]?.category.name ?? 'Prestador',
       categoryId: provider.categories[0]?.category.id ?? null,
       rating: Number(provider.averageRating),
@@ -105,6 +105,7 @@ export async function providersRoutes(app: FastifyInstance) {
           select: {
             id: true,
             name: true,
+            avatarUrl: true,
             isActive: true,
             reviewsReceived: {
               where: { status: 'APPROVED' },
@@ -129,13 +130,14 @@ export async function providersRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Provider not found' });
     }
 
-    if (!provider.isVerified || !provider.user.isActive) {
+    if (!provider.user.isActive) {
       return reply.code(404).send({ error: 'Provider not found' });
     }
 
     return {
       id: provider.user.id,
       name: provider.user.name,
+      avatarUrl: provider.user.avatarUrl,
       category: provider.categories[0]?.category.name ?? 'Prestador',
       categoryId: provider.categories[0]?.category.id ?? null,
       rating: Number(provider.averageRating),

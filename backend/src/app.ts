@@ -13,9 +13,9 @@ function configuredOrigins() {
 
 export async function buildApp() {
   const app = Fastify({
-    bodyLimit: 64 * 1024,
+    bodyLimit: 4 * 1024 * 1024,
     logger: process.env.NODE_ENV !== 'test',
-    trustProxy: process.env.TRUST_PROXY === 'true' ? 1 : false,
+    trustProxy: process.env.TRUST_PROXY === 'true' ? (_address, hop) => hop === 0 : false,
   });
   const origins = configuredOrigins();
 

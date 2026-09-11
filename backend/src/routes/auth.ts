@@ -9,6 +9,16 @@ import { createRateLimit } from '../middleware/rate-limit.js';
 const DUMMY_PASSWORD_HASH = '$argon2id$v=19$m=65536,p=4,t=3$EZPJf/FcpGcwlQv/PYA65Q$oCRRh4BZPQxzXb5s9LHcpFtUSyAs1Kzrs+F7dostk8M';
 const normalizedEmail = z.string().trim().email().max(254).transform((value) => value.toLowerCase());
 const normalizedPhone = z.string().transform((value) => value.replace(/\D/g, '')).pipe(z.string().regex(/^\d{10,15}$/));
+const providerProfileSchema = z.object({
+  categoryId: z.string().uuid(),
+  bio: z.string().trim().max(5000),
+  specialties: z.array(z.string().trim().min(1).max(100)).max(20),
+  city: z.string().trim().max(120),
+  neighborhood: z.string().trim().max(120),
+  state: z.string().trim().length(2).transform((value) => value.toUpperCase()),
+  hourlyRate: z.number().finite().min(0).max(100_000),
+  isUrgentAvailable: z.boolean(),
+}).strict();
 
 const registerSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -16,11 +26,23 @@ const registerSchema = z.object({
   phone: normalizedPhone,
   password: z.string().min(8).max(128),
   role: z.enum(['CLIENT', 'PROVIDER']).optional(),
-}).strict();
+  providerProfile: providerProfileSchema.optional(),
+}).strict().superRefine((value, context) => {
+  if (value.role === 'PROVIDER' && !value.providerProfile) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['providerProfile'],
+      message: 'Provider profile is required',
+    });
+  }
+});
 
 const loginSchema = z.object({
   email: normalizedEmail,
   password: z.string().min(1).max(128),
+}).strict();
+const avatarSchema = z.object({
+  avatarUrl: z.string().regex(/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/, 'Invalid image data'),
 }).strict();
 
 export async function authRoutes(app: FastifyInstance) {
@@ -43,7 +65,7 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Invalid payload', issues: parsed.error.flatten() });
     }
 
-    const { name, email, phone, password, role = 'CLIENT' } = parsed.data;
+    const { name, email, phone, password, role = 'CLIENT', providerProfile } = parsed.data;
 
     const [existingEmail, existingPhone] = await Promise.all([
       prisma.user.findUnique({ where: { email } }),
@@ -65,16 +87,55 @@ export async function authRoutes(app: FastifyInstance) {
 
     let user;
     try {
-      user = await prisma.user.create({
-        data: {
-          name,
-          email,
-          phone,
-          passwordHash,
-          role: role === 'PROVIDER' ? 'PROVIDER' : 'CLIENT',
-        },
+      user = await prisma.$transaction(async (tx) => {
+        const createdUser = await tx.user.create({
+          data: {
+            name,
+            email,
+            phone,
+            passwordHash,
+            role: role === 'PROVIDER' ? 'PROVIDER' : 'CLIENT',
+          },
+        });
+
+        if (role === 'PROVIDER' && providerProfile) {
+          const category = await tx.category.findFirst({
+            where: { id: providerProfile.categoryId, isActive: true },
+            select: { id: true },
+          });
+          if (!category) {
+            const error = new Error('Provider category is invalid or inactive') as Error & { code: string };
+            error.code = 'INVALID_PROVIDER_CATEGORY';
+            throw error;
+          }
+
+          const profile = await tx.providerProfile.create({
+            data: {
+              userId: createdUser.id,
+              bio: providerProfile.bio,
+              specialties: providerProfile.specialties,
+              city: providerProfile.city,
+              neighborhood: providerProfile.neighborhood,
+              state: providerProfile.state,
+              hourlyRate: providerProfile.hourlyRate,
+              isUrgentAvailable: providerProfile.isUrgentAvailable,
+              isVerified: false,
+            },
+          });
+          await tx.providerCategory.create({
+            data: {
+              providerProfileId: profile.id,
+              categoryId: category.id,
+            },
+          });
+        }
+
+        return createdUser;
       });
     } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'INVALID_PROVIDER_CATEGORY') {
+        return reply.code(400).send({ error: error.message });
+      }
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         return reply.code(409).send({ error: 'Dados já cadastrados' });
       }
@@ -100,8 +161,38 @@ export async function authRoutes(app: FastifyInstance) {
     const payload = { sub: user.id, role: user.role };
     return {
       accessToken: signAccessToken(payload),
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, avatarUrl: user.avatarUrl },
     };
+  });
+
+  app.put('/me/avatar', { preHandler: requireAuth }, async (request, reply) => {
+    const user = request.user;
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const parsed = avatarSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Invalid image' });
+    if (Buffer.byteLength(parsed.data.avatarUrl, 'utf8') > 3 * 1024 * 1024) {
+      return reply.code(413).send({ error: 'A imagem deve ter no máximo 2 MB.' });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: user.sub },
+      data: { avatarUrl: parsed.data.avatarUrl },
+      select: { id: true, avatarUrl: true },
+    });
+    return { id: updated.id, avatarUrl: updated.avatarUrl };
+  });
+
+  app.delete('/me/avatar', { preHandler: requireAuth }, async (request, reply) => {
+    const user = request.user;
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const updated = await prisma.user.update({
+      where: { id: user.sub },
+      data: { avatarUrl: null },
+      select: { id: true, avatarUrl: true },
+    });
+    return { id: updated.id, avatarUrl: updated.avatarUrl };
   });
 
   app.get('/me', { preHandler: requireAuth }, async (request, reply) => {
@@ -112,7 +203,7 @@ export async function authRoutes(app: FastifyInstance) {
 
     const dbUser = await prisma.user.findUnique({
       where: { id: user.sub },
-      select: { id: true, name: true, email: true, role: true, isActive: true },
+      select: { id: true, name: true, email: true, role: true, avatarUrl: true, isActive: true },
     });
     if (!dbUser?.isActive) {
       return reply.code(401).send({ error: 'Unauthorized' });
@@ -123,6 +214,7 @@ export async function authRoutes(app: FastifyInstance) {
       name: dbUser.name,
       email: dbUser.email,
       role: dbUser.role,
+      avatarUrl: dbUser.avatarUrl,
     };
   });
 }

@@ -2,11 +2,11 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
-import { Avatar, AvatarFallback } from '../components/ui/avatar';
-import { Star, MapPin, Clock, ShieldCheck, MessageCircle, Wrench, ChevronLeft, Calendar, Award, CheckCircle2 } from 'lucide-react';
+import { Star, MapPin, Clock, MessageCircle, Wrench, ChevronLeft, Calendar, Award, CheckCircle2 } from 'lucide-react';
 import { Separator } from '../components/ui/separator';
-import { apiGet, apiPost } from '../lib/api';
+import { ApiError, apiGet, apiPost } from '../lib/api';
 import { toast } from 'sonner';
 import { getCurrentUser } from '../lib/session';
 
@@ -15,6 +15,8 @@ export default function ProviderProfile() {
   const navigate = useNavigate();
   const [provider, setProvider] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
   const [isBooking, setIsBooking] = useState(false);
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [description, setDescription] = useState('');
@@ -59,18 +61,26 @@ export default function ProviderProfile() {
     }
 
     const fetchProvider = async () => {
+      setLoading(true);
+      setLoadError('');
+      setProvider(null);
       try {
         const result = await apiGet<any>(`/api/providers/${id}`);
         setProvider(result);
-      } catch {
-        setProvider(null);
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) {
+          setProvider(null);
+        } else {
+          setProvider(null);
+          setLoadError('Não foi possível carregar o perfil do prestador.');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchProvider();
-  }, [id]);
+  }, [id, retryKey]);
 
   if (loading) {
     return (
@@ -81,6 +91,20 @@ export default function ProviderProfile() {
   }
 
   if (!provider) {
+    if (loadError) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+          <Card className="w-full max-w-md p-8 text-center">
+            <h1 className="text-xl font-semibold text-foreground">Não foi possível carregar o perfil</h1>
+            <p className="mt-2 text-sm text-muted-foreground">Verifique sua conexão e tente novamente.</p>
+            <Button className="mt-6" variant="secondary" onClick={() => setRetryKey((current) => current + 1)}>
+              Tentar novamente
+            </Button>
+          </Card>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-background flex flex-col">
         {/* Header */}
@@ -146,6 +170,7 @@ export default function ProviderProfile() {
           <div className="flex flex-col sm:flex-row gap-6">
             <div className="flex-shrink-0 mx-auto sm:mx-0">
               <Avatar className="h-28 w-28">
+                {provider.avatarUrl && <AvatarImage src={provider.avatarUrl} alt={`Foto de ${provider.name}`} />}
                 <AvatarFallback className="bg-secondary/20 text-secondary text-2xl">
                   {provider.name?.split(' ').map((n: string) => n[0]).join('')}
                 </AvatarFallback>
@@ -156,12 +181,6 @@ export default function ProviderProfile() {
               <div>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2 justify-center sm:justify-start">
                   <h1 className="text-3xl font-bold text-foreground">{provider.name}</h1>
-                  {provider.verified && (
-                    <Badge className="bg-success/10 text-success border-success/20 w-fit mx-auto sm:mx-0">
-                      <ShieldCheck className="h-4 w-4 mr-1" />
-                      Verificado
-                    </Badge>
-                  )}
                 </div>
                 <p className="text-lg text-muted-foreground">{provider.category}</p>
               </div>

@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
-  CheckCircle2,
   Clock3,
-  DollarSign,
   MessageCircle,
+  LogOut,
   Star,
   TrendingUp,
   Users,
@@ -14,24 +13,18 @@ import {
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
-import { Avatar, AvatarFallback } from '../components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { apiGet, apiPatch } from '../lib/api';
-import { getCurrentUser } from '../lib/session';
+import { clearSession, getCurrentUser } from '../lib/session';
 import { toast } from 'sonner';
 
 type DashboardPayload = {
-  verification: {
-    status: string;
-    reviewedAt: string | null;
-    rejectionReason: string | null;
-  };
   setup: {
     profileReady: boolean;
-    verificationReady: boolean;
   };
   provider: {
-    verified: boolean;
+    avatarUrl?: string | null;
     hourlyRate: number | null;
     averageRating: number;
     totalReviews: number;
@@ -64,18 +57,15 @@ type ProviderProfilePayload = {
   id: string;
   name: string;
   email: string;
+  avatarUrl?: string | null;
   bio?: string;
   city?: string;
   neighborhood?: string;
   state?: string;
   hourlyRate?: number | null;
   isUrgentAvailable?: boolean;
-  isVerified?: boolean;
   category?: string;
 };
-
-const currency = (value: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
 function formatActivityDate(value: string | null) {
   if (!value) return 'A combinar';
@@ -120,13 +110,19 @@ function statusTone(status: string) {
 }
 
 export default function ProviderDashboard() {
+  const navigate = useNavigate();
   const currentUser = getCurrentUser();
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
   const [profile, setProfile] = useState<ProviderProfilePayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
+  const [updatingRequestId, setUpdatingRequestId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadDashboard = async () => {
+      setLoading(true);
+      setLoadError('');
       try {
         const [dashboardData, profileData] = await Promise.all([
           apiGet<DashboardPayload>('/api/provider/dashboard'),
@@ -137,22 +133,28 @@ export default function ProviderDashboard() {
         setProfile(profileData);
       } catch (error) {
         console.error(error);
+        setLoadError('Não foi possível carregar o painel do prestador.');
       } finally {
         setLoading(false);
       }
     };
 
     loadDashboard();
-  }, []);
+  }, [retryKey]);
 
   const providerName = profile?.name || currentUser?.name || 'Prestador';
+  const providerAvatarUrl = profile?.avatarUrl || dashboard?.provider?.avatarUrl || currentUser?.avatarUrl;
   const providerCategory = profile?.category || dashboard?.provider?.category || 'Prestador';
   const averageRating = dashboard?.provider?.averageRating ?? 0;
   const totalReviews = dashboard?.provider?.totalReviews ?? 0;
-  const providerVerified = dashboard?.provider?.verified ?? profile?.isVerified ?? false;
   const profileReady = dashboard?.setup?.profileReady ?? Boolean(profile);
   const needsOnboarding = !profileReady;
   const shouldShowSetupBanner = needsOnboarding;
+
+  const handleLogout = () => {
+    clearSession();
+    navigate('/login', { replace: true });
+  };
 
   const requests = dashboard?.requests ?? [];
   const pendingRequests = requests.filter((request) => request.status === 'REQUESTED');
@@ -162,25 +164,30 @@ export default function ProviderDashboard() {
   const recentReviews = dashboard?.reviews ?? [];
 
   const updateRequestStatus = async (requestId: string, status: string) => {
+    if (updatingRequestId) return;
+    if (status === 'CANCELLED' && !window.confirm('Deseja cancelar este serviço?')) return;
+
     try {
+      setUpdatingRequestId(requestId);
       await apiPatch(`/api/services/${requestId}/status`, { status });
       setDashboard((current) => {
         if (!current) return current;
 
+        const nextRequests = status === 'CANCELLED'
+          ? current.requests.filter((request) => request.id !== requestId)
+          : current.requests.map((request) =>
+              request.id === requestId ? { ...request, status } : request,
+            );
+
         return {
           ...current,
-          requests: current.requests.map((request) =>
-            request.id === requestId ? { ...request, status } : request,
-          ),
+          requests: nextRequests,
           stats: {
             ...current.stats,
-            pendingRequests: current.requests.filter((request) =>
-              request.id === requestId ? status === 'REQUESTED' : request.status === 'REQUESTED',
+            pendingRequests: nextRequests.filter((request) => request.status === 'REQUESTED').length,
+            activeServices: nextRequests.filter((request) =>
+              request.status === 'ACCEPTED' || request.status === 'IN_PROGRESS',
             ).length,
-            activeServices: current.requests.filter((request) => {
-              const requestStatus = request.id === requestId ? status : request.status;
-              return requestStatus === 'ACCEPTED' || requestStatus === 'IN_PROGRESS';
-            }).length,
             completedThisMonth:
               status === 'COMPLETED' ? current.stats.completedThisMonth + 1 : current.stats.completedThisMonth,
           },
@@ -189,6 +196,8 @@ export default function ProviderDashboard() {
       toast.success('Status do serviço atualizado.');
     } catch (error: any) {
       toast.error(error?.message || 'Não foi possível atualizar o serviço.');
+    } finally {
+      setUpdatingRequestId(null);
     }
   };
 
@@ -198,19 +207,13 @@ export default function ProviderDashboard() {
         pending: 0,
         active: 0,
         completed: 0,
-        earnings: 0,
       };
     }
-
-    const totalEarnings = dashboard.stats.totalEarnings
-      ? Number(dashboard.stats.totalEarnings.replace(/[^\d,.-]/g, '').replace(',', '.'))
-      : 0;
 
     return {
       pending: dashboard.stats.pendingRequests,
       active: dashboard.stats.activeServices,
       completed: dashboard.stats.completedThisMonth,
-      earnings: totalEarnings,
     };
   }, [dashboard]);
 
@@ -222,12 +225,26 @@ export default function ProviderDashboard() {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-background grid place-items-center p-6">
+        <Card className="w-full max-w-md p-8 text-center">
+          <h1 className="text-xl font-semibold text-foreground">Não foi possível carregar o painel</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Verifique sua conexão e tente novamente.</p>
+          <Button className="mt-6" variant="secondary" onClick={() => setRetryKey((current) => current + 1)}>
+            Tentar novamente
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card/90 backdrop-blur-sm sticky top-0 z-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
-            <Link to="/" className="flex items-center gap-2">
+            <Link to="/home" className="flex items-center gap-2">
               <Wrench className="h-7 w-7 text-secondary" />
               <span className="text-xl font-semibold text-foreground">FazTudo+</span>
             </Link>
@@ -238,6 +255,16 @@ export default function ProviderDashboard() {
                   Mensagens
                 </Button>
               </Link>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="flex items-center gap-2"
+                onClick={handleLogout}
+              >
+                <LogOut className="h-4 w-4" />
+                Sair
+              </Button>
               <Avatar className="h-9 w-9 border border-border">
                 <AvatarFallback className="bg-secondary text-secondary-foreground font-semibold">
                   {providerName
@@ -257,6 +284,7 @@ export default function ProviderDashboard() {
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
               <Avatar className="h-20 w-20">
+                {providerAvatarUrl && <AvatarImage src={providerAvatarUrl} alt={`Foto de ${providerName}`} />}
                 <AvatarFallback className="bg-secondary/20 text-secondary text-xl font-bold">
                   {providerName
                     .split(' ')
@@ -268,12 +296,6 @@ export default function ProviderDashboard() {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-2xl font-bold text-foreground">{providerName}</h1>
-                  {providerVerified && (
-                    <Badge className="bg-success/10 text-success border-success/20">
-                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                      Verificado
-                    </Badge>
-                  )}
                 </div>
                 <p className="text-muted-foreground">{providerCategory}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-4 text-sm">
@@ -324,18 +346,7 @@ export default function ProviderDashboard() {
           </Card>
         )}
 
-        <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Card className="p-5">
-            <div className="flex items-center gap-3">
-              <div className="rounded-xl bg-secondary/10 p-3 text-secondary">
-                <DollarSign className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Receita total</p>
-                <p className="text-2xl font-bold text-foreground">{currency(stats.earnings)}</p>
-              </div>
-            </div>
-          </Card>
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <Card className="p-5">
             <div className="flex items-center gap-3">
               <div className="rounded-xl bg-orange-100 p-3 text-orange-700">
@@ -379,7 +390,7 @@ export default function ProviderDashboard() {
                 <Badge className="ml-2 bg-secondary">{pendingRequests.length}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="active">Em andamento</TabsTrigger>
+            <TabsTrigger value="active">Aceitos e em andamento</TabsTrigger>
             <TabsTrigger value="reviews">Avaliações</TabsTrigger>
           </TabsList>
 
@@ -418,9 +429,20 @@ export default function ProviderDashboard() {
                         <Button
                           variant="secondary"
                           size="sm"
+                          disabled={updatingRequestId === request.id}
                           onClick={() => updateRequestStatus(request.id, 'ACCEPTED')}
                         >
-                          Aceitar
+                          {updatingRequestId === request.id ? 'Salvando...' : 'Aceitar'}
+                        </Button>
+                      )}
+                      {['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'].includes(request.status) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={updatingRequestId === request.id}
+                          onClick={() => updateRequestStatus(request.id, 'CANCELLED')}
+                        >
+                          {updatingRequestId === request.id ? 'Salvando...' : 'Cancelar'}
                         </Button>
                       )}
                       <Link to={`/chat/servico/${request.id}`}>
@@ -439,7 +461,7 @@ export default function ProviderDashboard() {
           <TabsContent value="active" className="space-y-4">
             {activeRequests.length === 0 ? (
               <Card className="p-6 text-muted-foreground">
-                Nenhum serviço em andamento neste momento.
+                Nenhum serviço aceito ou em andamento neste momento.
               </Card>
             ) : (
               activeRequests.map((request) => (
@@ -471,18 +493,30 @@ export default function ProviderDashboard() {
                         <Button
                           variant="secondary"
                           size="sm"
+                          disabled={updatingRequestId === request.id}
                           onClick={() => updateRequestStatus(request.id, 'IN_PROGRESS')}
                         >
-                          Iniciar
+                          {updatingRequestId === request.id ? 'Salvando...' : 'Iniciar'}
                         </Button>
                       )}
                       {(request.status === 'ACCEPTED' || request.status === 'IN_PROGRESS') && (
                         <Button
                           variant="secondary"
                           size="sm"
+                          disabled={updatingRequestId === request.id}
                           onClick={() => updateRequestStatus(request.id, 'COMPLETED')}
                         >
-                          Finalizar
+                          {updatingRequestId === request.id ? 'Salvando...' : 'Finalizar'}
+                        </Button>
+                      )}
+                      {['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'].includes(request.status) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={updatingRequestId === request.id}
+                          onClick={() => updateRequestStatus(request.id, 'CANCELLED')}
+                        >
+                          {updatingRequestId === request.id ? 'Salvando...' : 'Cancelar'}
                         </Button>
                       )}
                       <Link to={`/chat/servico/${request.id}`}>

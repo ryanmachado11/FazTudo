@@ -56,6 +56,7 @@ function serializeRoom(room: any) {
     providerName: room.provider.name,
     lastMessage: room.messages?.[0]?.content ?? '',
     lastMessageAt: room.messages?.[0]?.createdAt ?? room.createdAt,
+    unreadCount: room.unreadCount ?? 0,
   };
 }
 
@@ -89,7 +90,6 @@ async function getOrCreateRoomForUser(user: { sub: string; role: string }, paylo
         clientId: true,
         providerId: true,
         provider: { select: { role: true, isActive: true } },
-        providerProfile: { select: { isVerified: true } },
       },
     });
     if (!service?.providerId) throw chatError(404, 'Service request not found');
@@ -99,21 +99,29 @@ async function getOrCreateRoomForUser(user: { sub: string; role: string }, paylo
     if (service.provider?.role !== 'PROVIDER' || !service.provider.isActive) {
       throw chatError(404, 'Provider not found');
     }
-    if (!service.providerProfile?.isVerified) throw chatError(403, 'Provider is not verified yet');
     clientId = service.clientId;
     providerId = service.providerId;
   } else if (user.role === 'CLIENT') {
     if (!providerId || providerId === user.sub) throw chatError(400, 'Invalid provider');
     const provider = await prisma.providerProfile.findUnique({
       where: { userId: providerId },
-      select: { isVerified: true, user: { select: { role: true, isActive: true } } },
+      select: { user: { select: { role: true, isActive: true } } },
     });
     if (!provider || provider.user.role !== 'PROVIDER' || !provider.user.isActive) {
       throw chatError(404, 'Provider not found');
     }
-    if (!provider.isVerified) throw chatError(403, 'Provider is not verified yet');
   } else {
     if (!payload.clientId || payload.clientId === user.sub) throw chatError(400, 'Invalid client');
+
+    const existingRoom = await prisma.chatRoom.findFirst({
+      where: { clientId: payload.clientId, providerId: user.sub, serviceRequestId: null },
+    });
+    if (existingRoom) {
+      const detailedRoom = await findRoomDetails(existingRoom.id);
+      if (!detailedRoom) throw chatError(404, 'Room not found');
+      return detailedRoom;
+    }
+
     const service = await prisma.serviceRequest.findFirst({
       where: { clientId: payload.clientId, providerId: user.sub, status: { not: 'CANCELLED' } },
       orderBy: { createdAt: 'desc' },
@@ -179,8 +187,20 @@ export async function chatRoutes(app: FastifyInstance) {
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
+
+    const unreadCounts = await prisma.chatMessage.groupBy({
+      by: ['roomId'],
+      where: {
+        roomId: { in: rooms.map((room) => room.id) },
+        senderId: { not: user.sub },
+        isRead: false,
+      },
+      _count: { _all: true },
+    });
+    const unreadByRoom = new Map(unreadCounts.map((entry) => [entry.roomId, entry._count._all]));
+
     return rooms
-      .map(serializeRoom)
+      .map((room) => serializeRoom({ ...room, unreadCount: unreadByRoom.get(room.id) ?? 0 }))
       .sort((left, right) => new Date(right.lastMessageAt).getTime() - new Date(left.lastMessageAt).getTime());
   });
 
@@ -219,6 +239,33 @@ export async function chatRoutes(app: FastifyInstance) {
       take: query.data.limit,
     });
     return messages.reverse();
+  });
+
+  app.post('/rooms/:id/read', { preHandler: requireAuth }, async (request, reply) => {
+    const params = z.object({ id: z.string().uuid() }).strict().safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: 'Invalid room id' });
+
+    const user = request.user;
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const room = await prisma.chatRoom.findUnique({
+      where: { id: params.data.id },
+      select: { clientId: true, providerId: true },
+    });
+    if (!room) return reply.code(404).send({ error: 'Room not found' });
+    if (room.clientId !== user.sub && room.providerId !== user.sub) {
+      return reply.code(403).send({ error: 'You do not have access to this room' });
+    }
+
+    const result = await prisma.chatMessage.updateMany({
+      where: {
+        roomId: params.data.id,
+        senderId: { not: user.sub },
+        isRead: false,
+      },
+      data: { isRead: true },
+    });
+    return { updatedCount: result.count };
   });
 
   app.post('/messages', { preHandler: [requireAuth, messageRateLimit] }, async (request, reply) => {

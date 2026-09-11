@@ -7,7 +7,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Alert, AlertTitle, AlertDescription } from '../components/ui/alert';
-import { ChevronLeft, Wrench, AlertTriangle, MapPin, Search, CheckCircle, ShieldAlert } from 'lucide-react';
+import { ChevronLeft, Wrench, AlertTriangle, MapPin, Search, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiGet, apiPost } from '../lib/api';
 
@@ -35,11 +35,11 @@ export default function Urgente() {
       // 1. Fetch categories to find target categoryId
       const categories = await apiGet<any[]>('/api/categories');
       const slugMap: Record<string, string> = {
-        vazamento: 'encanador',
-        energia: 'eletricista',
-        chaveiro: 'chaveiro',
+        vazamento: 'hidraulica',
+        energia: 'eletrica',
+        chaveiro: 'estrutura-reparos',
       };
-      const targetSlug = slugMap[urgencyType] || 'eletricista';
+      const targetSlug = slugMap[urgencyType] || 'hidraulica';
       const category = categories.find(c => c.slug === targetSlug);
 
       if (!category) {
@@ -66,7 +66,7 @@ export default function Urgente() {
       setServiceRequestId(created.service.id);
       setIsSearching(false);
       setSearchComplete(true);
-      toast.success('Profissional de emergência encontrado!');
+      toast.success('Solicitação urgente enviada.');
 
     } catch (error: any) {
       setIsSearching(false);
@@ -110,14 +110,14 @@ export default function Urgente() {
             <div>
               <AlertTitle className="font-bold text-foreground text-sm">Serviço de Emergência Urgente</AlertTitle>
               <AlertDescription className="text-xs text-muted-foreground mt-1">
-                Ao solicitar esta modalidade, nossa plataforma busca ativamente prestadores verificados num raio de até 5km prontos para atendimento imediato. Taxa de deslocamento fixa de R$ 50 incluída.
+                A solicitação será enviada a um prestador da categoria selecionada que informou disponibilidade para urgências. A confirmação do atendimento depende da resposta do profissional.
               </AlertDescription>
             </div>
           </Alert>
 
           {!isSearching && !searchComplete ? (
             <Card className="p-6 sm:p-10 border border-border shadow-sm">
-              <h1 className="text-2xl font-bold text-foreground mb-6">Solicitar Atendimento Imediato</h1>
+              <h1 className="text-2xl font-bold text-foreground mb-6">Solicitar Atendimento Urgente</h1>
 
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Select Type of Emergency */}
@@ -176,7 +176,7 @@ export default function Urgente() {
                 {/* Call Action Button */}
                 <Button type="submit" variant="secondary" className="w-full h-12 text-base font-bold bg-accent hover:bg-accent/90 text-foreground">
                   <AlertTriangle className="h-5 w-5 mr-2 animate-bounce" />
-                  Chamar Profissional de Emergência
+                  Enviar Solicitação Urgente
                 </Button>
               </form>
             </Card>
@@ -191,16 +191,12 @@ export default function Urgente() {
               </div>
 
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold text-foreground">Buscando Profissional Próximo...</h2>
+                <h2 className="text-2xl font-bold text-foreground">Procurando Prestador Disponível...</h2>
                 <p className="text-muted-foreground text-sm max-w-sm mx-auto leading-relaxed">
-                  Estamos contactando eletricistas/encanadores verificados num raio de até 5km. Por favor, mantenha esta página aberta.
+                  Estamos procurando um prestador da categoria selecionada com disponibilidade para urgências e enviaremos a solicitação em seguida.
                 </p>
               </div>
 
-              <div className="bg-muted/50 p-4 rounded-xl inline-flex items-center gap-2 text-xs text-muted-foreground max-w-sm border border-border text-left mx-auto">
-                <ShieldAlert className="h-5 w-5 text-accent flex-shrink-0" />
-                <span>Nossos parceiros urgência possuem nota mínima de 4.8 e verificação criminal aprovada.</span>
-              </div>
             </Card>
           ) : (
             /* Search Complete/Success Interface */
@@ -212,9 +208,9 @@ export default function Urgente() {
               </div>
 
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold text-foreground">Profissional Encontrado!</h2>
+                <h2 className="text-2xl font-bold text-foreground">Solicitação Enviada</h2>
                 <p className="text-muted-foreground text-sm max-w-sm mx-auto leading-relaxed">
-                  **{foundProvider?.name} ({foundProvider?.category})** aceitou o seu chamado e está a caminho de sua residência.
+                  Sua solicitação foi enviada para {foundProvider?.name}, profissional de {foundProvider?.category}. Aguarde a resposta pelo chat.
                 </p>
               </div>
 
@@ -224,11 +220,7 @@ export default function Urgente() {
                     <p className="text-sm font-bold text-foreground">{foundProvider?.name}</p>
                     <p className="text-xs text-muted-foreground">{foundProvider?.category} - ⭐ {foundProvider?.rating} ({foundProvider?.reviews} avaliações)</p>
                   </div>
-                  <Badge className="bg-success/15 text-success border-success/20">A caminho</Badge>
-                </div>
-                <div className="text-xs space-y-1 border-t border-border pt-3 text-muted-foreground">
-                  <p><strong>Tempo estimado de chegada:</strong> 15 minutos</p>
-                  <p><strong>Taxa fixa de atendimento:</strong> R$ 50,00 + serviço a combinar</p>
+                  <Badge className="bg-accent/15 text-accent border-accent/20">Aguardando resposta</Badge>
                 </div>
               </div>
 

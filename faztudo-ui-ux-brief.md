@@ -1,353 +1,110 @@
-# FazTudo+ — UI/UX Design Completo no Figma
+# FazTudo+ — Diretrizes de UI/UX & Design System
 
-Aja como um DESIGNER UI/UX SÊNIOR especializado em:
-- design de produtos digitais
-- marketplaces
-- aplicativos urbanos
-- design mobile-first
-- acessibilidade
-- experiência do usuário
-- interfaces modernas
-- design systems
-- produtos escaláveis
-- startups brasileiras
-
-Seu objetivo é criar o DESIGN COMPLETO no Figma do projeto FazTudo+, uma plataforma brasileira de contratação de serviços urbanos.
+> **Documento de Referência de Design e Experiência do Usuário**  
+> **Tema Central:** Fraternidade e Moradia  
+> **Foco:** Mobile-first, Acessibilidade, Simplicidade e Confiança  
 
 ---
 
-# IMPORTANTE
+## 1. Princípios de Design e Propósito do Produto
 
-O projeto deve parecer:
-- real
-- profissional
-- utilizável
-- moderno
-- humano
-- acessível
-- pronto para mercado brasileiro
+O **FazTudo+** foi desenhado para ser uma plataforma brasileira acolhedora, humana e de alta utilidade prática, conectando moradores a profissionais autônomos para reparos e manutenções residenciais.
 
-NÃO quero:
-- aparência genérica de template
-- visual SaaS americano padrão
-- interface corporativa fria
-- visual cyberpunk/gamer
-- excesso de glassmorphism
-- gradientes exagerados
-- estética futurista artificial
-
-O sistema deve transmitir:
-- confiança
-- praticidade
-- acessibilidade
-- simplicidade
-- segurança
-- proximidade humana
+### Pilares Fundamentais:
+* **Clareza e Acessibilidade:** Interfaces legíveis e descomplicadas, pensadas para pessoas de todas as idades, incluindo idosos e usuários com baixa intimidade digital.
+* **Confiança e Transparência:** Perfis de profissionais com histórico real de avaliações, média de notas de clientes comprovados e informações claras sobre áreas atendidas.
+* **Comunicação Segura e Centralizada:** Toda a interação acontece por meio do **Chat Interno do FazTudo+**, garantindo privacidade aos moradores e prestadores sem expor contatos particulares.
+* **Agilidade no Atendimento:** Botão de emergência residencial (`/urgente`) e busca rápida por categorias de serviços essenciais.
 
 ---
 
-# SOBRE O PROJETO
+## 2. O que Evitar e o que Priorizar
 
-O FazTudo+ é uma plataforma urbana brasileira que conecta clientes e prestadores de serviços locais.
+### Evitar:
+* Aparência de template genérico internacional ou SaaS corporativo frio.
+* Poluição visual, cores berrantes, néon ou elementos estilo gamer/cyberpunk.
+* Menus profundos e navegações labirínticas.
+* Redirecionamentos para canais externos (o sistema não utiliza WhatsApp nem mensageiros de terceiros).
+* Telas de envio de documentos burocráticos (o sistema não utiliza validação por RG, CPF ou selfies).
 
-O foco principal da plataforma é:
-- confiança
-- verificação de profissionais
-- facilidade de comunicação
-- contratação rápida
-- experiência acessível
-
-O sistema é pensado para:
-- trabalhadores autônomos
-- idosos
-- famílias brasileiras
-- pessoas comuns
-- usuários com pouca familiaridade tecnológica
+### Priorizar:
+* Botões grandes, áreas de toque confortáveis (mobile-first).
+* Contraste tipográfico elevado e excelente legibilidade.
+* Paleta acolhedora inspirada no ambiente urbano e residencial brasileiro.
+* Microinterações discretas para feedback de ações (toasts, loading states, badge counters).
 
 ---
 
-# DIFERENCIAL PRINCIPAL
+## 3. Identidade Visual e Design Tokens
 
-O principal diferencial NÃO é quantidade de serviços.
+### 3.1. Cores
+* **Fundos e Superfícies:** Tons neutros balanceados, branco suave e superfícies limpas com sombras sutis (`shadow-sm`, `shadow-md`).
+* **Cor Primária / Acento:** Laranja/âmbar quente (transmitindo acolhimento, energia e conexão com o trabalho manual/reforma).
+* **Cor Secundária:** Tons grafite/chumbo para contrastes de texto e elementos de sustentação.
+* **Cores de Estado (Feedback):**
+  * Verde suave: status concluído (`COMPLETED`), confirmações de sucesso e mensagens lidas.
+  * Âmbar / Azul suave: status em andamento (`IN_PROGRESS` / `ACCEPTED`).
+  * Laranja suave: solicitações pendentes (`REQUESTED`).
+  * Vermelho discreto: cancelamento (`CANCELLED`) e alertas de erro.
 
-O principal diferencial é:
-- confiança
-- segurança
-- profissionais verificados
-- reputação
-- comunicação simples
-- experiência humana
-
-O design deve refletir isso visualmente.
-
----
-
-# MVP INICIAL
-
-O MVP deve focar apenas em:
-- eletricistas
-- encanadores
-- montadores
-
-Evitar dezenas de categorias.
-
-O foco deve ser:
-- clareza
-- simplicidade
-- usabilidade
-- sensação de produto real
+### 3.2. Tipografia
+* Tipografia sem serifa moderna, neutra e de alta legibilidade em qualquer resolução (família Inter/sans-serif).
+* Escala hierárquica bem definida com títulos objetivos e textos de apoio explicativos.
 
 ---
 
-# IDENTIDADE VISUAL
+## 4. Telas e Fluxos Principais da Interface
 
-## PALETA DE CORES
+### 4.1. Landing Page (`/`)
+* **Hero Section:** Apresentação clara da proposta de valor com chamada para ação (buscar serviço ou cadastrar-se como prestador).
+* **Categorias Populares:** Acesso direto a serviços essenciais como eletricista, encanador, pintor, montador e pedreiro.
+* **Seção "Como Funciona":** Explicação em passos simples da busca ao atendimento.
+* **Depoimentos e Confiança:** Destaque para a segurança e a valorização do trabalho local.
 
-Usar:
-- grafite/chumbo
-- branco quente
-- amarelo queimado
-- detalhes laranja discretos
-- verde apenas para confirmações/status
+### 4.2. Home do Morador/Cliente (`/home`)
+* Barra de busca rápida por profissional ou tipo de reparo.
+* Atalhos por categoria e filtro para prestadores com atendimento urgente.
+* Lista de cards de profissionais com foto, nota média, especialidades e localização.
+* Cabeçalho intuitivo com acesso a "Meus serviços", "Mensagens" e foto de perfil.
 
-Evitar:
-- neon
-- roxo futurista
-- visual gamer
-- excesso de azul corporativo
-- cores artificiais
+### 4.3. Perfil do Prestador (`/prestador/:id`)
+* Foto de identificação, nome e selo de perfil ativo.
+* Valor hora de referência, especialidades e cidades/bairros atendidos.
+* Estatísticas de atendimento e comentários reais de clientes com nota de 1 a 5 estrelas.
+* Ação direta para contratação ou abertura de conversa no chat interno.
 
----
+### 4.4. Chat Interno do FazTudo+ (`/chat/:id` e `/mensagens`)
+* **Lista de Conversas (`/mensagens`):** Relação de conversas ativas com foto do interlocutor, resumo da última mensagem, horário e badge de mensagens não lidas.
+* **Sala de Conversa (`/chat/:id`):**
+  * Bolhas de mensagens claramente diferenciadas entre remetente e destinatário.
+  * Indicador de leitura de mensagens (`isRead`).
+  * Informações de contexto do serviço vinculado ao topo da conversa.
+  * Envio instantâneo de texto e negociação direta dentro da plataforma.
 
-# TIPOGRAFIA
+### 4.5. Gestão de Serviços do Cliente (`/servicos`)
+* Acompanhamento de todas as contratações em andamento e histórico.
+* Badges coloridos indicando o status atual da ordem (`Solicitado`, `Aceito`, `Em andamento`, `Concluído`, `Cancelado`).
+* Opção de editar a descrição e a data enquanto o chamado estiver aguardando aprovação (`REQUESTED`).
+* Botão para cancelamento de serviços não finalizados.
+* Modal de avaliação (1 a 5 estrelas e comentário) liberado assim que o serviço é finalizado.
 
-A tipografia deve ser:
-- moderna
-- extremamente legível
-- confortável
-- acessível para idosos
-- limpa e profissional
+### 4.6. Painel do Prestador (`/dashboard`)
+* Resumo operacional com métricas simples: solicitações pendentes, serviços ativos e concluídos no mês.
+* Lista de pedidos recebidos com ações imediatas para aceitar, iniciar atendimento ou recusar/cancelar.
+* Acesso às últimas avaliações recebidas de clientes.
 
-Priorizar:
-- contraste alto
-- boa hierarquia visual
-- excelente espaçamento
-- leitura fácil
+### 4.7. Edição de Perfil Profissional (`/perfil/editar`)
+* Formulário para atualização de especialidades, biografia, valor hora e chave de disponibilidade para emergências.
 
----
-
-# ESTILO VISUAL
-
-Inspirar-se em:
-- WhatsApp (simplicidade)
-- iFood (praticidade)
-- Nubank (organização)
-- OLX (sensação local)
-
-MAS:
-- sem copiar
-- criar identidade própria
-- transmitir Brasil urbano real
-
-O produto deve parecer:
-- utilizável
-- humano
-- moderno
-- confiável
-- acolhedor
+### 4.8. Cadastro e Autenticação (`/login`, `/cadastro`, `/cadastro-prestador`)
+* Formulários limpos, sem campos desnecessários e sem burocracia documental.
+* Mensagens de validação em tempo real com orientações claras de preenchimento.
 
 ---
 
-# UX/UI
+## 5. Acessibilidade e Experiência Inclusiva
 
-A experiência deve priorizar:
-- simplicidade
-- clareza
-- rapidez
-- conforto visual
-- acessibilidade
-- mobile first
-
-Adicionar:
-- botões grandes
-- excelente espaçamento
-- navegação intuitiva
-- elementos familiares
-- poucos elementos por tela
-
-Evitar:
-- poluição visual
-- menus complexos
-- excesso de animações
-- elementos futuristas exagerados
-
----
-
-# TELAS NECESSÁRIAS
-
-Criar designs COMPLETOS e PROFISSIONAIS para:
-
-## 1. Landing Page
-Adicionar:
-- navbar moderna
-- hero section forte
-- mockup do app
-- CTA principal
-- categorias
-- “como funciona”
-- seção de confiança
-- seção de profissionais verificados
-- avaliações
-- footer moderno
-
----
-
-## 2. Home do Cliente
-Adicionar:
-- barra de busca
-- categorias rápidas
-- profissionais próximos
-- botão “urgente”
-- cards modernos de prestadores
-- visual acessível
-
----
-
-## 3. Perfil do Prestador
-Adicionar:
-- foto
-- nota
-- avaliações
-- selo verificado
-- especializações
-- região
-- botão contratar
-- botão conversar
-- indicadores de confiança
-
----
-
-## 4. Chat
-O chat deve parecer:
-- simples
-- familiar
-- natural
-- inspirado em apps populares
-
-Adicionar:
-- bolhas de mensagens
-- envio de imagem
-- visual de áudio
-- horário
-- botão proposta
-- status do serviço
-- visual confortável
-
----
-
-## 5. Dashboard do Prestador
-Adicionar:
-- pedidos recebidos
-- ganhos
-- agenda
-- avaliações
-- serviços em andamento
-- métricas simples
-
----
-
-## 6. Login e Cadastro
-Criar:
-- fluxo intuitivo
-- acessível
-- moderno
-- simples
-
----
-
-## 7. Tela de Verificação
-Adicionar:
-- upload de documentos
-- selfie
-- status de validação
-- explicação de segurança
-
----
-
-## 8. Sistema de Avaliações
-Adicionar:
-- comentários
-- notas
-- reputação
-- indicadores de confiança
-
----
-
-# DESIGN SYSTEM
-
-Criar:
-- componentes reutilizáveis
-- sistema de cores
-- tipografia
-- botões
-- inputs
-- cards
-- badges
-- modais
-- navegação
-- sistema de espaçamento
-
-Tudo deve parecer:
-- consistente
-- profissional
-- escalável
-
----
-
-# RESPONSIVIDADE
-
-Criar versões:
-- mobile
-- tablet
-- desktop
-
-PRIORIDADE:
-mobile first.
-
----
-
-# MICROINTERAÇÕES
-
-Adicionar:
-- hover suave
-- feedback visual
-- animações discretas
-- estados de loading
-- empty states
-- estados ativos
-
-Evitar exageros.
-
----
-
-# OBJETIVO FINAL
-
-O resultado final deve parecer:
-- uma startup brasileira REAL
-- um produto pronto para mercado
-- algo utilizável por famílias brasileiras
-- confiável e humano
-
-A interface deve transmitir:
-- confiança
-- segurança
-- proximidade
-- simplicidade
-- praticidade
-
-O design deve impressionar:
-- visualmente
-- funcionalmente
-- estrategicamente
-
-O projeto deve parecer um produto que poderia realmente crescer no Brasil.
+Como o projeto está inserido no contexto de **Fraternidade e Moradia**, a interface foi pensada para acolher diferentes perfis da sociedade:
+* **Áreas de Clique Confortáveis:** Todos os botões e links possuem altura mínima adequada para toque em telas de smartphones.
+* **Textos Descritivos:** Rótulos explícitos em formulários (`<label>`) e contraste de cores que atende às recomendações WCAG AA.
+* **Design Responsivo:** Comportamento fluido desde telas móveis compactas (360px de largura) até monitores desktop widescreen.

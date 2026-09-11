@@ -7,7 +7,7 @@ import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
-import { ApiError, apiGet, apiPost, apiPut } from '../lib/api';
+import { ApiError, apiGet, apiPost } from '../lib/api';
 import { serviceCategories } from '../lib/categoriesData';
 import { saveSession } from '../lib/session';
 
@@ -70,12 +70,28 @@ export default function CadastroPrestador() {
     setIsSubmitting(true);
 
     try {
+      const dbCategories = await apiGet<any[]>('/api/categories');
+      const matchedDbCategory = dbCategories.find((entry) => entry.slug === category);
+      if (!matchedDbCategory) {
+        throw new Error('A categoria selecionada não está disponível. Tente novamente.');
+      }
+
       await apiPost('/api/auth/register', {
         name,
         email,
         phone,
         password,
         role: 'PROVIDER',
+        providerProfile: {
+          bio: `Profissional especializado em ${subcategory}. Experiencia: ${experience}.`,
+          specialties: [subcategory],
+          city: 'Sao Paulo',
+          neighborhood: '',
+          state: 'SP',
+          hourlyRate: 0,
+          isUrgentAvailable: true,
+          categoryId: matchedDbCategory.id,
+        },
       });
 
       const loginRes: any = await apiPost('/api/auth/login', {
@@ -86,26 +102,6 @@ export default function CadastroPrestador() {
       saveSession({
         accessToken: loginRes.accessToken,
         user: loginRes.user,
-      });
-
-      const dbCategories = await apiGet<any[]>('/api/categories');
-      const categorySlugMap: Record<string, string> = {
-        eletrica: 'eletricista',
-        hidraulica: 'encanador',
-        'montagem-instalacao': 'montador-de-moveis',
-      };
-      const targetSlug = categorySlugMap[category] || 'eletricista';
-      const matchedDbCategory = dbCategories.find((entry) => entry.slug === targetSlug) || dbCategories[0];
-
-      await apiPut('/api/provider/profile/me', {
-        bio: `Profissional especializado em ${subcategory}. Experiencia: ${experience}.`,
-        specialties: [subcategory],
-        city: 'Sao Paulo',
-        neighborhood: '',
-        state: 'SP',
-        hourlyRate: 0,
-        isUrgentAvailable: true,
-        categoryIds: matchedDbCategory ? [matchedDbCategory.id] : [],
       });
 
       toast.success('Cadastro concluido com sucesso!');
@@ -168,7 +164,7 @@ export default function CadastroPrestador() {
               <div>
                 <h1 className="text-2xl font-bold text-foreground mb-2">Seja um prestador FazTudo+</h1>
                 <p className="text-muted-foreground text-sm">
-                  Crie sua conta e complete o perfil para iniciar o processo de verificação.
+                  Crie sua conta e complete o perfil para começar a receber solicitações.
                 </p>
               </div>
 
@@ -311,7 +307,7 @@ export default function CadastroPrestador() {
               <div>
                 <h1 className="text-2xl font-bold text-foreground mb-2">Revise seu cadastro</h1>
                 <p className="text-muted-foreground text-sm">
-                  Seu perfil será criado como pendente até a verificação da plataforma.
+                  Confira seus dados antes de criar a conta de prestador.
                 </p>
               </div>
 
@@ -360,11 +356,11 @@ export default function CadastroPrestador() {
 
               <div className="space-y-2">
                 <Badge className="bg-secondary/15 text-secondary border-secondary/20 text-sm py-1 px-3">
-                  Aguardando verificação
+                  Perfil criado
                 </Badge>
                 <h1 className="text-2xl font-bold text-foreground">Cadastro concluido</h1>
                 <p className="text-muted-foreground text-sm max-w-sm mx-auto">
-                  Sua conta de prestador foi criada. Complete o perfil e aguarde a verificação para receber solicitações.
+                  Sua conta de prestador foi criada. Complete o perfil para começar a receber solicitações.
                 </p>
               </div>
 

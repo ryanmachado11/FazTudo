@@ -43,10 +43,14 @@ export default function Chat() {
   const [roomId, setRoomId] = useState<string | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
   const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     const loadConversation = async () => {
+      setLoading(true);
+      setLoadError('');
       if (!targetId) {
         setLoading(false);
         return;
@@ -90,8 +94,10 @@ export default function Chat() {
 
         const roomMessages = await apiGet<any[]>(`/api/chat/rooms/${room.room.id}/messages?limit=100`);
         setMessages(roomMessages);
+        await apiPost(`/api/chat/rooms/${room.room.id}/read`, {});
       } catch (error: any) {
         setRoomId(null);
+        setLoadError(error?.message || 'Não foi possível abrir a conversa.');
         toast.error(error?.message || 'Nao foi possivel abrir a conversa.');
       } finally {
         setLoading(false);
@@ -99,7 +105,7 @@ export default function Chat() {
     };
 
     loadConversation();
-  }, [currentUser?.id, currentUser?.role, navigate, serviceRequestId, targetId]);
+  }, [currentUser?.id, currentUser?.role, navigate, retryKey, serviceRequestId, targetId]);
 
   useEffect(() => {
     if (!roomId) {
@@ -197,13 +203,32 @@ export default function Chat() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {loading && <p className="text-muted-foreground">Carregando conversa...</p>}
 
-          <div className="flex items-center justify-center mb-6">
-            <Badge variant="secondary" className="bg-muted text-muted-foreground">
-              Hoje
-            </Badge>
-          </div>
+          {loadError ? (
+            <Card className="p-8 text-center">
+              <h2 className="text-lg font-semibold text-foreground">Não foi possível abrir a conversa</h2>
+              <p className="mt-2 text-sm text-muted-foreground">Verifique sua conexão e tente novamente.</p>
+              <Button
+                className="mt-4"
+                variant="secondary"
+                onClick={() => {
+                  setRoomId(null);
+                  setMessages([]);
+                  setContact(null);
+                  setRetryKey((current) => current + 1);
+                }}
+              >
+                Tentar novamente
+              </Button>
+            </Card>
+          ) : (
+            <>
+              <div className="flex items-center justify-center mb-6">
+                <Badge variant="secondary" className="bg-muted text-muted-foreground">
+                  Hoje
+                </Badge>
+              </div>
 
-          <div className="space-y-4">
+              <div className="space-y-4">
             {messages.map((msg: any) => {
               const isMine = msg.senderId === currentUser?.id;
 
@@ -259,7 +284,9 @@ export default function Chat() {
                 </div>
               );
             })}
-          </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
