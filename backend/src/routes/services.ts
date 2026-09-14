@@ -189,7 +189,7 @@ export async function servicesRoutes(app: FastifyInstance) {
       return reply.code(409).send({ error: 'Only requested services can be edited' });
     }
 
-    const { categoryId, description, urgencyFlag = false, scheduledFor } = parsedBody.data;
+    const { categoryId, description, urgencyFlag, scheduledFor } = parsedBody.data;
     const category = await prisma.category.findFirst({
       where: { id: categoryId, isActive: true },
       select: { id: true },
@@ -227,7 +227,7 @@ export async function servicesRoutes(app: FastifyInstance) {
         categoryId,
         description,
         urgencyFlag,
-        scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
+        scheduledFor: scheduledFor === undefined ? undefined : scheduledFor ? new Date(scheduledFor) : null,
       },
     });
     if (updated.count !== 1) {

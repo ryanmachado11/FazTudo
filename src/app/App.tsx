@@ -20,12 +20,14 @@ const ClientServices = lazy(() => import('./pages/ClientServices'));
 const Messages = lazy(() => import('./pages/Messages'));
 
 function RequireRole({ roles, children }: { roles: string[]; children: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, error, retry } = useAuth();
   const location = useLocation();
 
   if (loading) {
     return <div className="min-h-screen grid place-items-center text-muted-foreground">Carregando...</div>;
   }
+
+  if (error) return <SessionError message={error} retry={retry} />;
 
   if (!user) {
     const redirectTo = encodeURIComponent(`${location.pathname}${location.search}`);
@@ -33,6 +35,9 @@ function RequireRole({ roles, children }: { roles: string[]; children: ReactNode
   }
 
   if (!roles.includes(user.role)) {
+    if (!['CLIENT', 'PROVIDER'].includes(user.role)) {
+      return <div role="alert" className="min-h-screen grid place-items-center">Esta conta não tem acesso a esta área.</div>;
+    }
     return <Navigate to={roleHome(user.role)} replace />;
   }
 
@@ -44,17 +49,29 @@ function roleHome(role: string) {
 }
 
 function RequireGuest({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, error, retry } = useAuth();
 
   if (loading) {
     return <div className="min-h-screen grid place-items-center text-muted-foreground">Carregando...</div>;
   }
+
+  if (error) return <SessionError message={error} retry={retry} />;
 
   if (user) {
     return <Navigate to={roleHome(user.role)} replace />;
   }
 
   return children;
+}
+
+function SessionError({ message, retry }: { message: string; retry: () => void }) {
+  return (
+    <div role="alert" className="min-h-screen flex flex-col items-center justify-center gap-4 p-6">
+      <p>Não foi possível validar sua sessão.</p>
+      <p className="text-muted-foreground">{message}</p>
+      <button type="button" className="rounded-md border px-4 py-2" onClick={retry}>Tentar novamente</button>
+    </div>
+  );
 }
 
 function NotFound() {
@@ -82,6 +99,7 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/home" element={<RequireRole roles={['CLIENT', 'PROVIDER']}><ClientHome /></RequireRole>} />
           <Route path="/prestador/:id" element={<ProviderProfile />} />
+          <Route path="/chat/room/:conversationId" element={<RequireRole roles={['CLIENT', 'PROVIDER']}><Chat /></RequireRole>} />
           <Route path="/chat/servico/:serviceRequestId" element={<RequireRole roles={['CLIENT', 'PROVIDER']}><Chat /></RequireRole>} />
           <Route path="/chat/:id" element={<RequireRole roles={['CLIENT', 'PROVIDER']}><Chat /></RequireRole>} />
           <Route path="/dashboard" element={<RequireRole roles={['PROVIDER']}><ProviderDashboard /></RequireRole>} />

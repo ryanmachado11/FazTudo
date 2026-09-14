@@ -8,7 +8,7 @@ import { Textarea } from '../components/ui/textarea';
 import { ProfilePhoto } from '../components/ProfilePhoto';
 import { ChevronLeft, Wrench, Save, X, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiGet, apiPut } from '../lib/api';
+import { ApiError, apiGet, apiPut } from '../lib/api';
 import { getCurrentUser } from '../lib/session';
 
 function parseHourlyRate(value: string) {
@@ -40,11 +40,14 @@ export default function PerfilEditar() {
   const [name, setName] = useState(currentUser?.name || '');
   const [category, setCategory] = useState('Elétrica');
   const [price, setPrice] = useState('');
-  const [region, setRegion] = useState('');
+  const [city, setCity] = useState('');
+  const [neighborhood, setNeighborhood] = useState('');
+  const [state, setState] = useState('');
   const [description, setDescription] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(currentUser?.avatarUrl || null);
   const [specialties, setSpecialties] = useState<string[]>([]);
   const [newSpecialty, setNewSpecialty] = useState('');
+  const [isUrgentAvailable, setIsUrgentAvailable] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [availableCategories, setAvailableCategories] = useState<any[]>([]);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
@@ -54,8 +57,17 @@ export default function PerfilEditar() {
   const [retryKey, setRetryKey] = useState(0);
 
   const handleAddSpecialty = () => {
-    if (newSpecialty.trim() && !specialties.includes(newSpecialty.trim())) {
-      setSpecialties([...specialties, newSpecialty.trim()]);
+    const specialty = newSpecialty.trim();
+    if (specialty.length > 100) {
+      toast.error('Cada especialidade deve ter no máximo 100 caracteres.');
+      return;
+    }
+    if (specialties.length >= 20) {
+      toast.error('Adicione no máximo 20 especialidades.');
+      return;
+    }
+    if (specialty && !specialties.some((item) => item.toLowerCase() === specialty.toLowerCase())) {
+      setSpecialties([...specialties, specialty]);
       setNewSpecialty('');
     }
   };
@@ -77,6 +89,7 @@ export default function PerfilEditar() {
         if (isMounted) {
           setAvailableCategories(categories);
           setCategoriesLoaded(true);
+          setCategory((current) => categories.some((item) => item.name === current) ? current : categories[0]?.name || '');
         }
       } catch (error) {
         console.error(error);
@@ -92,14 +105,30 @@ export default function PerfilEditar() {
           setAvatarUrl(profile.avatarUrl || null);
           setDescription(profile.bio || '');
           setSpecialties(Array.isArray(profile.specialties) ? profile.specialties : []);
-          setRegion([profile.city, profile.neighborhood, profile.state].filter(Boolean).join(' - '));
+          setCity(profile.city || '');
+          setNeighborhood(profile.neighborhood || '');
+          setState(profile.state || '');
           setPrice(profile.hourlyRate ? `A partir de R$ ${Number(profile.hourlyRate).toFixed(2)}` : '');
           setCategory(profile.category || 'Elétrica');
+          setIsUrgentAvailable(Boolean(profile.isUrgentAvailable));
           setProfileLoaded(true);
         }
       } catch (error) {
-        console.error(error);
-        if (isMounted) setLoadError('Não foi possível carregar seu perfil.');
+        if (isMounted && error instanceof ApiError && error.status === 404) {
+          setName(currentUser?.name || '');
+          setAvatarUrl(currentUser?.avatarUrl || null);
+          setDescription('');
+          setSpecialties([]);
+          setCity('');
+          setNeighborhood('');
+          setState('');
+          setPrice('');
+          setIsUrgentAvailable(false);
+          setProfileLoaded(true);
+        } else if (isMounted) {
+          console.error(error);
+          setLoadError('Não foi possível carregar seu perfil.');
+        }
       } finally {
         if (isMounted) setIsLoadingProfile(false);
       }
@@ -117,19 +146,22 @@ export default function PerfilEditar() {
 
     try {
       const categoryMatch = availableCategories.find((cat) => cat.name === category);
-      const regionParts = region.split(' - ').map((part) => part.trim()).filter(Boolean);
-      const state = regionParts.length > 1 ? regionParts.at(-1) : undefined;
-      const neighborhood = regionParts.length > 2 ? regionParts.slice(1, -1).join(' - ') : '';
       const categoryIds = categoriesLoaded && categoryMatch ? [categoryMatch.id] : undefined;
+      const hourlyRate = parseHourlyRate(price);
+      if (hourlyRate < 0 || hourlyRate > 100_000) {
+        toast.error('Informe um valor entre R$ 0 e R$ 100.000.');
+        return;
+      }
 
       await apiPut('/api/provider/profile/me', {
         name: name.trim(),
         bio: description,
         specialties,
-        city: regionParts[0] || '',
-        neighborhood,
-        state,
-        hourlyRate: parseHourlyRate(price),
+        city: city.trim(),
+        neighborhood: neighborhood.trim(),
+        state: state.trim().toUpperCase(),
+        hourlyRate,
+        isUrgentAvailable,
         categoryIds,
       });
       toast.success('Perfil atualizado com sucesso!');
@@ -218,6 +250,8 @@ export default function PerfilEditar() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
+                    minLength={2}
+                    maxLength={120}
                     className="bg-input-background"
                   />
                 </div>
@@ -240,7 +274,7 @@ export default function PerfilEditar() {
                 </div>
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid sm:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="price">Preço Médio / Base</Label>
                   <Input
@@ -252,14 +286,39 @@ export default function PerfilEditar() {
                     className="bg-input-background"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="region">Região de Atendimento</Label>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="city">Cidade</Label>
                   <Input
-                    id="region"
-                    value={region}
-                    onChange={(e) => setRegion(e.target.value)}
+                    id="city"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
                     required
-                    placeholder="Ex: Zona Sul - São Paulo"
+                    maxLength={120}
+                    placeholder="Ex: São Paulo"
+                    className="bg-input-background"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="neighborhood">Bairro</Label>
+                  <Input
+                    id="neighborhood"
+                    value={neighborhood}
+                    onChange={(e) => setNeighborhood(e.target.value)}
+                    maxLength={120}
+                    placeholder="Ex: Bela Vista"
+                    className="bg-input-background"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="state">UF</Label>
+                  <Input
+                    id="state"
+                    value={state}
+                    onChange={(e) => setState(e.target.value.toUpperCase())}
+                    required
+                    minLength={2}
+                    maxLength={2}
+                    placeholder="SP"
                     className="bg-input-background"
                   />
                 </div>
@@ -273,6 +332,7 @@ export default function PerfilEditar() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   required
+                  maxLength={5000}
                   placeholder="Escreva um pouco sobre sua experiência e serviços oferecidos..."
                   className="bg-input-background"
                 />
@@ -318,6 +378,15 @@ export default function PerfilEditar() {
                   </Button>
                 </div>
               </div>
+
+              <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={isUrgentAvailable}
+                  onChange={(event) => setIsUrgentAvailable(event.target.checked)}
+                />
+                Disponível para atendimentos urgentes
+              </label>
             </div>
 
             {/* Form actions */}

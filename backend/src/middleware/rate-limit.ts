@@ -2,7 +2,11 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 
 type Bucket = { count: number; resetAt: number };
 
-export function createRateLimit(options: { limit: number; windowMs: number }) {
+export function createRateLimit(options: {
+  limit: number;
+  windowMs: number;
+  key?: (request: FastifyRequest) => string;
+}) {
   const buckets = new Map<string, Bucket>();
   let nextCleanupAt = 0;
 
@@ -15,7 +19,7 @@ export function createRateLimit(options: { limit: number; windowMs: number }) {
       nextCleanupAt = now + options.windowMs;
     }
 
-    const key = request.ip;
+    const key = options.key?.(request) ?? request.ip;
     const current = buckets.get(key);
     if (!current && buckets.size >= 10_000) {
       reply.header('Retry-After', Math.max(1, Math.ceil(options.windowMs / 1000)));

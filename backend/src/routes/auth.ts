@@ -44,10 +44,34 @@ const loginSchema = z.object({
 const avatarSchema = z.object({
   avatarUrl: z.string().regex(/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/, 'Invalid image data'),
 }).strict();
+const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
+
+function decodeAvatar(avatarUrl: string) {
+  return Buffer.from(avatarUrl.slice(avatarUrl.indexOf(',') + 1), 'base64');
+}
+
+function hasValidAvatarSignature(avatarUrl: string, bytes: Buffer) {
+  if (avatarUrl.startsWith('data:image/jpeg;')) return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (avatarUrl.startsWith('data:image/png;')) return bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  if (avatarUrl.startsWith('data:image/gif;')) return ['GIF87a', 'GIF89a'].includes(bytes.subarray(0, 6).toString('ascii'));
+  return avatarUrl.startsWith('data:image/webp;')
+    && bytes.subarray(0, 4).toString('ascii') === 'RIFF'
+    && bytes.subarray(8, 12).toString('ascii') === 'WEBP';
+}
 
 export async function authRoutes(app: FastifyInstance) {
   const registerRateLimit = createRateLimit({ limit: 5, windowMs: 60 * 60 * 1000 });
-  const loginRateLimit = createRateLimit({ limit: 10, windowMs: 15 * 60 * 1000 });
+  const loginIpRateLimit = createRateLimit({ limit: 20, windowMs: 15 * 60 * 1000 });
+  const loginAccountRateLimit = createRateLimit({
+    limit: 10,
+    windowMs: 15 * 60 * 1000,
+    key: (request) => {
+      const email = typeof (request.body as { email?: unknown })?.email === 'string'
+        ? (request.body as { email: string }).email.trim().toLowerCase()
+        : '<invalid-email>';
+      return `${request.ip}:${email}`;
+    },
+  });
 
   function sendFieldError(reply: FastifyReply, statusCode: number, fieldErrors: Record<string, string[]>, message: string) {
     return reply.code(statusCode).send({
@@ -145,7 +169,7 @@ export async function authRoutes(app: FastifyInstance) {
     return reply.code(201).send({ user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   });
 
-  app.post('/login', { preHandler: loginRateLimit }, async (request, reply) => {
+  app.post('/login', { preHandler: [loginIpRateLimit, loginAccountRateLimit] }, async (request, reply) => {
     const parsed = loginSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'Invalid payload' });
@@ -171,8 +195,12 @@ export async function authRoutes(app: FastifyInstance) {
 
     const parsed = avatarSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid image' });
-    if (Buffer.byteLength(parsed.data.avatarUrl, 'utf8') > 3 * 1024 * 1024) {
+    const avatarBytes = decodeAvatar(parsed.data.avatarUrl);
+    if (avatarBytes.byteLength > MAX_AVATAR_SIZE) {
       return reply.code(413).send({ error: 'A imagem deve ter no máximo 2 MB.' });
+    }
+    if (!hasValidAvatarSignature(parsed.data.avatarUrl, avatarBytes)) {
+      return reply.code(400).send({ error: 'Invalid image' });
     }
 
     const updated = await prisma.user.update({

@@ -34,8 +34,8 @@ function formatTime(value?: string) {
 }
 
 export default function Chat() {
-  const { id, serviceRequestId } = useParams();
-  const targetId = serviceRequestId || id;
+  const { id, serviceRequestId, conversationId } = useParams();
+  const targetId = conversationId || serviceRequestId || id;
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
   const [message, setMessage] = useState('');
@@ -51,26 +51,31 @@ export default function Chat() {
     const loadConversation = async () => {
       setLoading(true);
       setLoadError('');
+      setRoomId(null);
+      setMessages([]);
+      setContact(null);
       if (!targetId) {
         setLoading(false);
         return;
       }
 
-      const currentPath = `/chat/${targetId}`;
+      const currentPath = conversationId ? `/chat/room/${conversationId}` : serviceRequestId ? `/chat/servico/${serviceRequestId}` : `/chat/${targetId}`;
 
       if (!currentUser || (currentUser.role !== 'CLIENT' && currentUser.role !== 'PROVIDER')) {
         toast.error('Faca login para abrir suas mensagens.');
-        navigate(`/login?redirectTo=${encodeURIComponent(currentPath)}`);
+        navigate(`/login?redirectTo=${encodeURIComponent(currentPath)}`, { replace: true });
         return;
       }
 
       try {
-        if (currentUser.role === 'CLIENT' && !serviceRequestId) {
+        if (currentUser.role === 'CLIENT' && !serviceRequestId && !conversationId) {
           const providerData = await apiGet<any>(`/api/providers/${targetId}`);
           setContact({ id: providerData.id, name: providerData.name || 'Prestador', role: 'PROVIDER' });
         }
 
-        const roomPayload = serviceRequestId
+        const roomPayload = conversationId
+          ? { roomId: conversationId }
+          : serviceRequestId
           ? { serviceRequestId }
           : currentUser.role === 'CLIENT'
             ? { providerId: targetId }
@@ -105,7 +110,7 @@ export default function Chat() {
     };
 
     loadConversation();
-  }, [currentUser?.id, currentUser?.role, navigate, retryKey, serviceRequestId, targetId]);
+  }, [currentUser?.id, currentUser?.role, navigate, retryKey, serviceRequestId, conversationId, targetId]);
 
   useEffect(() => {
     if (!roomId) {

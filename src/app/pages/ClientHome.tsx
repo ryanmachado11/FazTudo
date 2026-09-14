@@ -6,7 +6,7 @@ import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { 
-  Search, Zap, Droplet, Box, Star, MapPin, Clock, ShieldCheck, MessageCircle, Wrench, AlertCircle, 
+  Search, Zap, Droplet, Box, Star, MapPin, ShieldCheck, MessageCircle, Wrench, AlertCircle,
   Sparkles, Wind, Shield, Truck, Construction, Flame, Layers, Maximize2, Armchair, Tv, Wifi, Waves, 
   Bug, LayoutGrid, Paintbrush, Hammer, TreePine, ChevronLeft, ChevronRight, X, Filter, Flame as PopularIcon, LogOut
 } from 'lucide-react';
@@ -49,7 +49,7 @@ export default function ClientHome() {
   const navigate = useNavigate();
   const { user: authenticatedUser } = useAuth();
   const currentUser = authenticatedUser || getCurrentUser();
-  const [uploadedAvatarUrl, setUploadedAvatarUrl] = useState<string | null>(null);
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(currentUser?.avatarUrl ?? null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<any | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
@@ -79,6 +79,10 @@ export default function ClientHome() {
     });
     return () => { isMounted = false; };
   }, [providersRetryKey]);
+
+  useEffect(() => {
+    setProfileAvatarUrl(currentUser?.avatarUrl ?? null);
+  }, [currentUser?.id, currentUser?.avatarUrl]);
 
   const handleScroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
@@ -172,12 +176,25 @@ export default function ClientHome() {
                   <span className="hidden sm:inline">Mensagens</span>
                 </Button>
               </Link>
-              <ProfilePhoto
-                name={currentUser?.name || 'Cliente'}
-                avatarUrl={uploadedAvatarUrl || currentUser?.avatarUrl}
-                className="h-9 w-9 border border-border"
-                onUploaded={setUploadedAvatarUrl}
-              />
+              <div
+                data-profile-navigation
+                onClickCapture={(event) => {
+                  const target = event.target as HTMLElement;
+                  if (target.closest('button.text-destructive')) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  navigate('/perfil/editar');
+                }}
+              >
+                <ProfilePhoto
+                  name={currentUser?.name || 'Cliente'}
+                  avatarUrl={profileAvatarUrl}
+                  className="h-9 w-9 border border-border"
+                  onUploaded={setProfileAvatarUrl}
+                  onRemoved={() => setProfileAvatarUrl(null)}
+                  allowRemove
+                />
+              </div>
               <Button type="button" variant="ghost" size="sm" className="flex items-center gap-1.5" onClick={handleLogout}>
                 <LogOut className="h-4 w-4" />
                 <span className="hidden sm:inline">Sair</span>
@@ -529,14 +546,12 @@ export default function ClientHome() {
                           <span className="font-semibold">{prof.rating}</span>
                           <span className="text-muted-foreground">({prof.reviews} avaliações)</span>
                         </div>
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <MapPin className="h-4 w-4" />
-                          {prof.distance}
-                        </div>
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <Clock className="h-4 w-4" />
-                          {prof.responseTime}
-                        </div>
+                        {prof.serviceRegion && (
+                          <div className="flex items-center gap-1 text-muted-foreground">
+                            <MapPin className="h-4 w-4" />
+                            {prof.serviceRegion}
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex flex-wrap gap-1.5">

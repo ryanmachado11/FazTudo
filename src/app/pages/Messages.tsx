@@ -53,7 +53,7 @@ export default function Messages() {
   useEffect(() => {
     if (!currentUser || (currentUser.role !== 'CLIENT' && currentUser.role !== 'PROVIDER')) {
       toast.error('Faça login para acessar suas mensagens.');
-      navigate('/login?redirectTo=/mensagens');
+      navigate('/login?redirectTo=/mensagens', { replace: true });
       return;
     }
 
@@ -145,12 +145,7 @@ export default function Messages() {
                 currentUser?.role === 'PROVIDER'
                   ? room.clientName || 'Cliente'
                   : room.providerName || 'Prestador';
-              const chatTargetId = currentUser?.role === 'PROVIDER' ? room.clientId : room.providerId;
-              const chatPath = room.serviceRequestId
-                ? `/chat/servico/${room.serviceRequestId}`
-                : chatTargetId
-                  ? `/chat/${chatTargetId}`
-                  : null;
+              const chatPath = `/chat/room/${room.id}`;
 
               return (
                 <Card key={room.id} className="p-4">

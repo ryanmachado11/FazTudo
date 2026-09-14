@@ -11,6 +11,7 @@ const optionalUuid = z.preprocess(
 );
 
 const createRoomSchema = z.object({
+  roomId: optionalUuid,
   providerId: optionalUuid,
   clientId: optionalUuid,
   serviceRequestId: optionalUuid,
@@ -77,6 +78,16 @@ async function findRoomDetails(id: string) {
 async function getOrCreateRoomForUser(user: { sub: string; role: string }, payload: ChatPayload) {
   if (user.role !== 'CLIENT' && user.role !== 'PROVIDER') {
     throw chatError(403, 'Only clients and providers can access conversations');
+  }
+
+  // Opening an existing conversation depends on membership, not a new service request.
+  if (payload.roomId) {
+    const room = await findRoomDetails(payload.roomId);
+    if (!room) throw chatError(404, 'Room not found');
+    if (room.clientId !== user.sub && room.providerId !== user.sub) {
+      throw chatError(403, 'You do not have access to this room');
+    }
+    return room;
   }
 
   let clientId = user.sub;

@@ -1,4 +1,4 @@
-import Fastify from 'fastify';
+import Fastify, { type FastifyError } from 'fastify';
 import cors from '@fastify/cors';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -19,6 +19,14 @@ export async function buildApp() {
   });
   const origins = configuredOrigins();
 
+  app.setErrorHandler<FastifyError>((error, request, reply) => {
+    if (!error.statusCode || error.statusCode >= 500) {
+      request.log.error({ err: error }, 'Unhandled API error');
+      return reply.code(500).send({ error: 'Internal server error' });
+    }
+    return reply.send(error);
+  });
+
   await app.register(cors, {
     credentials: false,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
@@ -29,6 +37,7 @@ export async function buildApp() {
 
   app.addHook('onSend', async (request, reply) => {
     const isPublicCatalog = request.method === 'GET'
+      && reply.statusCode >= 200 && reply.statusCode < 300
       && (request.url.startsWith('/api/categories') || request.url.startsWith('/api/providers'));
     reply.header('Cache-Control', isPublicCatalog ? 'public, max-age=60, stale-while-revalidate=300' : 'no-store');
     reply.header('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");

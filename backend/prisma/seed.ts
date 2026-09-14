@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import argon2 from 'argon2';
+import { seedPassword } from '../src/lib/seed-password.js';
 
 const prisma = new PrismaClient();
 
@@ -82,21 +83,7 @@ async function main() {
     await prisma.category.update({ where: { id: legacy.id }, data: { isActive: false } });
   }
 
-  console.log('Seeding admin user...');
-  const adminEmail = 'admin@faztudo.com';
-  const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
-  const commonPasswordHash = await argon2.hash('FazTudo123!');
-  if (!existingAdmin) {
-    await prisma.user.create({
-      data: {
-        name: 'Admin FazTudo',
-        email: adminEmail,
-        phone: '+5511999999999',
-        passwordHash: commonPasswordHash,
-        role: 'ADMIN',
-      },
-    });
-  }
+  const commonPasswordHash = await argon2.hash(seedPassword());
 
   // Create clients for reviews
   console.log('Seeding client users...');

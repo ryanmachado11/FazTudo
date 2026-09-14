@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
-import { Star, MapPin, Clock, MessageCircle, Wrench, ChevronLeft, Calendar, Award, CheckCircle2 } from 'lucide-react';
+import { Star, MapPin, MessageCircle, Wrench, ChevronLeft, Calendar, Award, CheckCircle2 } from 'lucide-react';
 import { Separator } from '../components/ui/separator';
 import { ApiError, apiGet, apiPost } from '../lib/api';
 import { toast } from 'sonner';
@@ -34,7 +34,7 @@ export default function ProviderProfile() {
     }
 
     toast.error('Faça login para contratar ou conversar com este prestador.');
-    navigate(`/login?redirectTo=${encodeURIComponent(`/prestador/${id}`)}`);
+    navigate(`/login?redirectTo=${encodeURIComponent(`/prestador/${id}`)}`, { replace: true });
     return false;
   };
 
@@ -191,14 +191,12 @@ export default function ProviderProfile() {
                   <span className="font-bold text-lg">{provider.rating}</span>
                   <span className="text-muted-foreground">({provider.reviews} avaliações)</span>
                 </div>
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <MapPin className="h-4 w-4" />
-                  {provider.distance}
-                </div>
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  {provider.responseTime}
-                </div>
+                {provider.serviceRegion && (
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <MapPin className="h-4 w-4" />
+                    {provider.serviceRegion}
+                  </div>
+                )}
               </div>
 
               {isBooking ? (
@@ -219,8 +217,9 @@ export default function ProviderProfile() {
                   )}
                   <div className="flex gap-2">
                     <Button size="sm" variant="secondary" className="flex-1" disabled={isSubmittingBooking} onClick={async () => {
-                      if (!description.trim()) {
-                        const message = 'Por favor, descreva o serviço desejado.';
+                      if (isSubmittingBooking) return;
+                      if (description.trim().length < 10) {
+                        const message = 'A descrição deve ter pelo menos 10 caracteres.';
                         setBookingError(message);
                         toast.error(message);
                         return;
@@ -245,7 +244,6 @@ export default function ProviderProfile() {
                         };
                         
                         const createdService = await apiPost<any>('/api/services', payload);
-                        await apiPost('/api/chat/rooms', { serviceRequestId: createdService.service.id });
                         toast.success('Solicitação de serviço enviada com sucesso!');
                         setIsBooking(false);
                         setDescription('');
@@ -261,7 +259,7 @@ export default function ProviderProfile() {
                     }}>
                       {isSubmittingBooking ? 'Enviando...' : 'Confirmar Contratação'}
                     </Button>
-                    <Button size="sm" variant="outline" className="flex-1" onClick={() => { setIsBooking(false); setDescription(''); }}>
+                    <Button size="sm" variant="outline" className="flex-1" disabled={isSubmittingBooking} onClick={() => { setIsBooking(false); setDescription(''); }}>
                       Cancelar
                     </Button>
                   </div>
@@ -318,7 +316,9 @@ export default function ProviderProfile() {
             <Card className="p-6">
               <h2 className="text-xl font-semibold mb-6">Avaliações</h2>
               <div className="space-y-6">
-                {provider.reviewsList.map((review) => (
+                {provider.reviewsList.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Este prestador ainda não recebeu avaliações.</p>
+                ) : provider.reviewsList.map((review) => (
                   <div key={review.id}>
                     <div className="flex items-start gap-4">
                       <Avatar className="h-10 w-10">
@@ -377,13 +377,6 @@ export default function ProviderProfile() {
                     <p className="font-semibold">{provider.memberSince}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <MessageCircle className="h-5 w-5 text-secondary" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Taxa de resposta</p>
-                    <p className="font-semibold">{provider.responseRate}</p>
-                  </div>
-                </div>
               </div>
             </Card>
 
@@ -392,7 +385,7 @@ export default function ProviderProfile() {
               <h3 className="font-semibold mb-2">Região de atendimento</h3>
               <div className="flex items-start gap-2">
                 <MapPin className="h-5 w-5 text-secondary flex-shrink-0 mt-0.5" />
-                <p className="text-muted-foreground">{provider.serviceRegion}</p>
+                <p className="text-muted-foreground">{provider.serviceRegion || 'Não informada'}</p>
               </div>
             </Card>
           </div>

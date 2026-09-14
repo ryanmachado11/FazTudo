@@ -11,9 +11,10 @@ services:
       # Compatível com volumes locais criados pela configuração anterior.
       # Em produção, sobrescreva DATABASE_URL com um usuário dedicado.
       DATABASE_URL: ${DATABASE_URL:-mysql://root:password@mysql:3306/faztudo}
-      JWT_SECRET: ${JWT_SECRET:-faztudo-local-development-jwt-secret-2026-only}
+      JWT_SECRET: ${JWT_SECRET:?Configure JWT_SECRET in backend/.env with a random secret of at least 32 characters}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
-      SEED_ON_START: ${SEED_ON_START:-true}
+      SEED_ON_START: ${SEED_ON_START:-false}
+      SEED_PASSWORD: ${SEED_PASSWORD:-}
     depends_on:
       mysql:
         condition: service_healthy

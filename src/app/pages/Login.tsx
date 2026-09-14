@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -7,8 +7,9 @@ import { Label } from '../components/ui/label';
 import { Separator } from '../components/ui/separator';
 import { Wrench } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiPost } from '../lib/api';
+import { ApiError, apiPost } from '../lib/api';
 import { saveSession } from '../lib/session';
+import { useAuth } from '../hooks/useAuth';
 
 type LoginResponse = {
   accessToken: string;
@@ -29,6 +30,16 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, loading: sessionLoading } = useAuth();
+
+  useEffect(() => {
+    if (sessionLoading || !user) return;
+    navigate(user.role === 'PROVIDER' ? '/dashboard' : '/home', { replace: true });
+  }, [navigate, sessionLoading, user]);
+
+  if (sessionLoading || user) {
+    return <div className="min-h-screen grid place-items-center text-muted-foreground">Carregando...</div>;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +57,9 @@ export default function Login() {
       const redirectTo = safeRedirectPath(params.get('redirectTo'));
       navigate(redirectTo || (data.user.role === 'PROVIDER' ? '/dashboard' : '/home'), { replace: true });
     } catch (error: any) {
-      toast.error(error?.message || 'Falha ao entrar.');
+      toast.error(error instanceof ApiError && error.status === 429
+        ? 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.'
+        : error?.message || 'Falha ao entrar.');
     } finally {
       setIsSubmitting(false);
     }

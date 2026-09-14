@@ -10,6 +10,24 @@ export type SessionData = {
 };
 
 const SESSION_KEY = 'faztudo_session';
+const SESSION_EVENT = 'faztudo:session';
+
+export function subscribeSession(listener: () => void) {
+  if (typeof window === 'undefined') return () => {};
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === SESSION_KEY || event.key === null) listener();
+  };
+  window.addEventListener(SESSION_EVENT, listener);
+  window.addEventListener('storage', onStorage);
+  return () => {
+    window.removeEventListener(SESSION_EVENT, listener);
+    window.removeEventListener('storage', onStorage);
+  };
+}
+
+function notifySession() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(SESSION_EVENT));
+}
 
 function storage(): Storage | null {
   return typeof window === 'undefined' ? null : window.sessionStorage;
@@ -22,6 +40,7 @@ export function saveSession(data: SessionData) {
   if (typeof window !== 'undefined') {
     window.localStorage.removeItem(SESSION_KEY);
   }
+  notifySession();
 }
 
 export function clearSession() {
@@ -29,6 +48,7 @@ export function clearSession() {
   if (typeof window !== 'undefined') {
     window.localStorage.removeItem(SESSION_KEY);
   }
+  notifySession();
 }
 
 export function getSession(): SessionData | null {
@@ -39,7 +59,15 @@ export function getSession(): SessionData | null {
   if (!json) return null;
 
   try {
-    return JSON.parse(json) as SessionData;
+    const data = JSON.parse(json);
+    if (typeof data?.accessToken !== 'string' || !data.accessToken.trim()
+      || typeof data.user?.id !== 'string' || !data.user.id
+      || typeof data.user?.name !== 'string'
+      || typeof data.user?.email !== 'string'
+      || !['CLIENT', 'PROVIDER', 'ADMIN'].includes(data.user?.role)) {
+      return null;
+    }
+    return data as SessionData;
   } catch {
     return null;
   }

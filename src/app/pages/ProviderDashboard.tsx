@@ -15,7 +15,7 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { apiGet, apiPatch } from '../lib/api';
+import { ApiError, apiGet, apiPatch } from '../lib/api';
 import { clearSession, getCurrentUser } from '../lib/session';
 import { toast } from 'sonner';
 
@@ -126,7 +126,10 @@ export default function ProviderDashboard() {
       try {
         const [dashboardData, profileData] = await Promise.all([
           apiGet<DashboardPayload>('/api/provider/dashboard'),
-          apiGet<ProviderProfilePayload>('/api/provider/profile/me').catch(() => null),
+          apiGet<ProviderProfilePayload>('/api/provider/profile/me').catch((error) => {
+            if (error instanceof ApiError && error.status === 404) return null;
+            throw error;
+          }),
         ]);
 
         setDashboard(dashboardData);
@@ -159,7 +162,7 @@ export default function ProviderDashboard() {
   const requests = dashboard?.requests ?? [];
   const pendingRequests = requests.filter((request) => request.status === 'REQUESTED');
   const activeRequests = requests.filter(
-    (request) => request.status === 'ACCEPTED' || request.status === 'IN_PROGRESS',
+    (request) => request.status === 'ACCEPTED' || request.status === 'IN_PROGRESS' || request.status === 'COMPLETED',
   );
   const recentReviews = dashboard?.reviews ?? [];
 
@@ -196,6 +199,7 @@ export default function ProviderDashboard() {
       toast.success('Status do serviço atualizado.');
     } catch (error: any) {
       toast.error(error?.message || 'Não foi possível atualizar o serviço.');
+      if (error instanceof ApiError && error.status === 409) setRetryKey((current) => current + 1);
     } finally {
       setUpdatingRequestId(null);
     }
@@ -265,15 +269,18 @@ export default function ProviderDashboard() {
                 <LogOut className="h-4 w-4" />
                 Sair
               </Button>
-              <Avatar className="h-9 w-9 border border-border">
-                <AvatarFallback className="bg-secondary text-secondary-foreground font-semibold">
-                  {providerName
-                    .split(' ')
-                    .map((part: string) => part[0])
-                    .join('')
-                    .slice(0, 2)}
-                </AvatarFallback>
-              </Avatar>
+              <Link to="/perfil/editar" aria-label="Abrir meu perfil">
+                <Avatar className="h-9 w-9 border border-border">
+                  {providerAvatarUrl && <AvatarImage src={providerAvatarUrl} alt={`Foto de ${providerName}`} />}
+                  <AvatarFallback className="bg-secondary text-secondary-foreground font-semibold">
+                    {providerName
+                      .split(' ')
+                      .map((part: string) => part[0])
+                      .join('')
+                      .slice(0, 2)}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
             </div>
           </div>
         </div>
@@ -283,16 +290,18 @@ export default function ProviderDashboard() {
         <Card className="mb-8 p-6">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
-              <Avatar className="h-20 w-20">
-                {providerAvatarUrl && <AvatarImage src={providerAvatarUrl} alt={`Foto de ${providerName}`} />}
-                <AvatarFallback className="bg-secondary/20 text-secondary text-xl font-bold">
-                  {providerName
-                    .split(' ')
-                    .map((part: string) => part[0])
-                    .join('')
-                    .slice(0, 2)}
-                </AvatarFallback>
-              </Avatar>
+              <Link to="/perfil/editar" aria-label="Abrir meu perfil">
+                <Avatar className="h-20 w-20">
+                  {providerAvatarUrl && <AvatarImage src={providerAvatarUrl} alt={`Foto de ${providerName}`} />}
+                  <AvatarFallback className="bg-secondary/20 text-secondary text-xl font-bold">
+                    {providerName
+                      .split(' ')
+                      .map((part: string) => part[0])
+                      .join('')
+                      .slice(0, 2)}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-2xl font-bold text-foreground">{providerName}</h1>
@@ -306,14 +315,14 @@ export default function ProviderDashboard() {
                   </div>
                   <div className="flex items-center gap-1 text-muted-foreground">
                     <Users className="h-4 w-4" />
-                    {pendingRequests.length + activeRequests.length} solicitações no painel
+                    {pendingRequests.length} solicitações no painel
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="flex gap-3">
-              <Link to={profileReady ? '/perfil/editar' : '/cadastro-prestador'}>
+              <Link to="/perfil/editar">
                 <Button variant="outline">
                   {profileReady ? 'Editar perfil' : 'Completar cadastro'}
                 </Button>
@@ -336,7 +345,7 @@ export default function ProviderDashboard() {
               </div>
 
               <div className="flex gap-3">
-                <Link to={profileReady ? '/perfil/editar' : '/cadastro-prestador'}>
+                <Link to="/perfil/editar">
                   <Button variant="secondary">
                     {profileReady ? 'Completar perfil' : 'Completar cadastro'}
                   </Button>
@@ -390,7 +399,7 @@ export default function ProviderDashboard() {
                 <Badge className="ml-2 bg-secondary">{pendingRequests.length}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="active">Aceitos e em andamento</TabsTrigger>
+            <TabsTrigger value="active">Serviços aceitos e concluídos</TabsTrigger>
             <TabsTrigger value="reviews">Avaliações</TabsTrigger>
           </TabsList>
 
@@ -429,7 +438,7 @@ export default function ProviderDashboard() {
                         <Button
                           variant="secondary"
                           size="sm"
-                          disabled={updatingRequestId === request.id}
+                          disabled={Boolean(updatingRequestId)}
                           onClick={() => updateRequestStatus(request.id, 'ACCEPTED')}
                         >
                           {updatingRequestId === request.id ? 'Salvando...' : 'Aceitar'}
@@ -439,7 +448,7 @@ export default function ProviderDashboard() {
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled={updatingRequestId === request.id}
+                          disabled={Boolean(updatingRequestId)}
                           onClick={() => updateRequestStatus(request.id, 'CANCELLED')}
                         >
                           {updatingRequestId === request.id ? 'Salvando...' : 'Cancelar'}
@@ -461,7 +470,7 @@ export default function ProviderDashboard() {
           <TabsContent value="active" className="space-y-4">
             {activeRequests.length === 0 ? (
               <Card className="p-6 text-muted-foreground">
-                Nenhum serviço aceito ou em andamento neste momento.
+                Nenhum serviço aceito, em andamento ou concluído neste momento.
               </Card>
             ) : (
               activeRequests.map((request) => (
@@ -493,7 +502,7 @@ export default function ProviderDashboard() {
                         <Button
                           variant="secondary"
                           size="sm"
-                          disabled={updatingRequestId === request.id}
+                          disabled={Boolean(updatingRequestId)}
                           onClick={() => updateRequestStatus(request.id, 'IN_PROGRESS')}
                         >
                           {updatingRequestId === request.id ? 'Salvando...' : 'Iniciar'}
@@ -503,7 +512,7 @@ export default function ProviderDashboard() {
                         <Button
                           variant="secondary"
                           size="sm"
-                          disabled={updatingRequestId === request.id}
+                          disabled={Boolean(updatingRequestId)}
                           onClick={() => updateRequestStatus(request.id, 'COMPLETED')}
                         >
                           {updatingRequestId === request.id ? 'Salvando...' : 'Finalizar'}
@@ -513,7 +522,7 @@ export default function ProviderDashboard() {
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled={updatingRequestId === request.id}
+                          disabled={Boolean(updatingRequestId)}
                           onClick={() => updateRequestStatus(request.id, 'CANCELLED')}
                         >
                           {updatingRequestId === request.id ? 'Salvando...' : 'Cancelar'}

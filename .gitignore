@@ -17,3 +17,4 @@ backend/dist/
 # Logs
 *.log
 npm-debug.log*
+.tmp-chrome-profile/

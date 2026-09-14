@@ -1,5 +1,4 @@
 import { PrismaClient } from '@prisma/client';
-import argon2 from 'argon2';
 const prisma = new PrismaClient();
 const categories = [
     { name: 'Elétrica', slug: 'eletrica', iconUrl: '/icons/eletrica.svg' },
@@ -31,19 +30,6 @@ async function main() {
             where: { slug: category.slug },
             update: {},
             create: category,
-        });
-    }
-    const existing = await prisma.user.findUnique({ where: { email: 'admin@faztudo.com' } });
-    if (!existing) {
-        const passwordHash = await argon2.hash('Admin123!');
-        await prisma.user.create({
-            data: {
-                name: 'Admin FazTudo',
-                email: 'admin@faztudo.com',
-                phone: '+5511999999999',
-                passwordHash,
-                role: 'ADMIN',
-            },
         });
     }
 }

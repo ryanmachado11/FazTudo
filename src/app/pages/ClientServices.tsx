@@ -7,7 +7,7 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Textarea } from '../components/ui/textarea';
-import { apiGet, apiPatch, apiPost } from '../lib/api';
+import { ApiError, apiGet, apiPatch, apiPost } from '../lib/api';
 import { getCurrentUser } from '../lib/session';
 
 type ServiceItem = {
@@ -89,7 +89,7 @@ export default function ClientServices() {
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'CLIENT') {
       toast.error('Faça login como cliente para ver seus serviços.');
-      navigate('/login?redirectTo=/servicos');
+      navigate('/login?redirectTo=/servicos', { replace: true });
       return;
     }
 
@@ -141,7 +141,7 @@ export default function ClientServices() {
   };
 
   const cancelService = async (service: ServiceItem) => {
-    if (cancellingServiceId || !window.confirm('Deseja cancelar este serviço?')) return;
+    if (cancellingServiceId || isSavingEdit || !window.confirm('Deseja cancelar este serviço?')) return;
 
     try {
       setCancellingServiceId(service.id);
@@ -149,9 +149,11 @@ export default function ClientServices() {
       setServices((current) =>
         current.map((item) => (item.id === service.id ? { ...item, status: 'CANCELLED' } : item)),
       );
+      setEditingId((current) => current === service.id ? null : current);
       toast.success('Serviço cancelado com sucesso.');
     } catch (error: any) {
       toast.error(error?.message || 'Não foi possível cancelar o serviço.');
+      if (error instanceof ApiError && error.status === 409) setRetryKey((current) => current + 1);
     } finally {
       setCancellingServiceId(null);
     }
@@ -176,7 +178,7 @@ export default function ClientServices() {
   };
 
   const saveEdit = async (service: ServiceItem) => {
-    if (isSavingEdit || service.status !== 'REQUESTED') return;
+    if (isSavingEdit || cancellingServiceId || service.status !== 'REQUESTED') return;
     if (editDescription.trim().length < 10) {
       toast.error('A descrição deve ter pelo menos 10 caracteres.');
       return;
@@ -205,6 +207,7 @@ export default function ClientServices() {
       toast.success('Serviço atualizado com sucesso.');
     } catch (error: any) {
       toast.error(error?.message || 'Não foi possível atualizar o serviço.');
+      if (error instanceof ApiError && error.status === 409) setRetryKey((current) => current + 1);
     } finally {
       setIsSavingEdit(false);
     }
@@ -277,14 +280,14 @@ export default function ClientServices() {
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled={cancellingServiceId === service.id}
+                        disabled={Boolean(cancellingServiceId) || isSavingEdit}
                         onClick={() => cancelService(service)}
                       >
                         {cancellingServiceId === service.id ? 'Cancelando...' : 'Cancelar'}
                       </Button>
                     )}
                     {service.status === 'REQUESTED' && (
-                      <Button variant="outline" size="sm" onClick={() => startEditing(service)} disabled={isSavingEdit}>
+                      <Button variant="outline" size="sm" onClick={() => startEditing(service)} disabled={isSavingEdit || Boolean(cancellingServiceId)}>
                         Editar
                       </Button>
                     )}
@@ -299,7 +302,7 @@ export default function ClientServices() {
                   </div>
                 </div>
 
-                {editingId === service.id && (
+                {editingId === service.id && service.status === 'REQUESTED' && (
                   <div className="mt-4 border-t border-border pt-4 space-y-3">
                     <Textarea
                       value={editDescription}
@@ -340,7 +343,7 @@ export default function ClientServices() {
                       <Button variant="outline" size="sm" onClick={() => setEditingId(null)} disabled={isSavingEdit}>
                         Fechar
                       </Button>
-                      <Button variant="secondary" size="sm" onClick={() => saveEdit(service)} disabled={isSavingEdit || isLoadingCategories}>
+                      <Button variant="secondary" size="sm" onClick={() => saveEdit(service)} disabled={isSavingEdit || isLoadingCategories || Boolean(cancellingServiceId)}>
                         {isSavingEdit ? 'Salvando...' : 'Salvar alterações'}
                       </Button>
                     </div>

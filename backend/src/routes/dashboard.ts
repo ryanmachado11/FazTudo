@@ -21,7 +21,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
         },
       }),
       prisma.serviceRequest.findMany({
-        where: { providerId: user.sub, status: { in: ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS'] } },
+        where: { providerId: user.sub, status: { in: ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] } },
         select: {
           id: true,
           clientId: true,

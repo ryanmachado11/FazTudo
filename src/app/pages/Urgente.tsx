@@ -16,7 +16,7 @@ export default function Urgente() {
   
   const [urgencyType, setUrgencyType] = useState('vazamento');
   const [description, setDescription] = useState('');
-  const [address, setAddress] = useState('Av. Paulista, 1000 - Bela Vista, São Paulo - SP');
+  const [address, setAddress] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchComplete, setSearchComplete] = useState(false);
   const [foundProvider, setFoundProvider] = useState<any>(null);
@@ -24,6 +24,7 @@ export default function Urgente() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSearching) return;
     if (!description.trim() || !address.trim()) {
       toast.error('Preencha todos os campos para continuar.');
       return;
@@ -164,6 +165,7 @@ export default function Urgente() {
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
                       id="address"
+                      placeholder="Informe o endereço onde precisa do atendimento"
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
                       maxLength={500}

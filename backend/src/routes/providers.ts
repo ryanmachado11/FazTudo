@@ -66,8 +66,6 @@ export async function providersRoutes(app: FastifyInstance) {
       reviews: provider.totalReviews,
       verified: provider.isVerified,
       price: provider.hourlyRate ? `A partir de R$ ${Number(provider.hourlyRate).toFixed(2)}` : 'A combinar',
-      distance: 'Próximo',
-      responseTime: '~15 min',
       specialties: Array.isArray(provider.specialties) && provider.specialties.length > 0
         ? provider.specialties
         : provider.categories.map((entry: any) => entry.category.name),
@@ -75,7 +73,6 @@ export async function providersRoutes(app: FastifyInstance) {
       serviceRegion: [provider.city, provider.neighborhood, provider.state].filter(Boolean).join(' - '),
       memberSince: provider.createdAt.toLocaleDateString('pt-BR'),
       completedJobs: provider._count.serviceRequests,
-      responseRate: '98%',
       isUrgentAvailable: provider.isUrgentAvailable,
     }));
   });
@@ -146,16 +143,12 @@ export async function providersRoutes(app: FastifyInstance) {
       price: provider.hourlyRate ? `A partir de R$ ${Number(provider.hourlyRate).toFixed(2)}` : 'A combinar',
       description: provider.bio ?? 'Prestador disponível para atendimento local.',
       serviceRegion: [provider.city, provider.neighborhood, provider.state].filter(Boolean).join(' - '),
-      completionRate: '98%',
-      responseTime: '~15 min',
       specialties: Array.isArray(provider.specialties) && provider.specialties.length > 0
         ? provider.specialties
         : provider.categories.map((entry: any) => entry.category.name),
       isUrgentAvailable: provider.isUrgentAvailable,
       completedJobs: provider._count.serviceRequests,
       memberSince: provider.createdAt.toLocaleDateString('pt-BR'),
-      responseRate: '98%',
-      distance: 'Próximo',
       reviewsList: (provider.user.reviewsReceived || []).map((r: any) => ({
         id: r.id,
         client: r.client.name,

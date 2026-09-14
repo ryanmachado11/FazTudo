@@ -68,13 +68,16 @@ test('access tokens enforce issuer, audience and algorithm', () => {
   assert.throws(() => verifyAccessToken(wrongAudience));
 });
 
-test('production rejects the bundled development JWT secret', () => {
+test('all environments reject the publicly known JWT secret', () => {
   const originalNodeEnv = process.env.NODE_ENV;
   const originalSecret = process.env.JWT_SECRET;
   process.env.NODE_ENV = 'production';
   process.env.JWT_SECRET = 'faztudo-local-development-jwt-secret-2026-only';
   try {
-    assert.throws(() => validateAuthConfig());
+    for (const environment of ['development', 'test', 'production']) {
+      process.env.NODE_ENV = environment;
+      assert.throws(() => validateAuthConfig());
+    }
   } finally {
     process.env.NODE_ENV = originalNodeEnv;
     process.env.JWT_SECRET = originalSecret;
@@ -446,12 +449,12 @@ test('profile and avatar endpoints are self-scoped and retain legitimate self-se
   try {
     const spoofedAvatarOwner = await app.inject({
       method: 'PUT', url: '/api/auth/me/avatar', headers,
-      payload: { userId: other, avatarUrl: 'data:image/png;base64,aGVsbG8=' },
+      payload: { userId: other, avatarUrl: 'data:image/png;base64,iVBORw0KGgo=' },
     });
     assert.equal(spoofedAvatarOwner.statusCode, 400);
 
     const ownAvatar = await app.inject({
-      method: 'PUT', url: '/api/auth/me/avatar', headers, payload: { avatarUrl: 'data:image/png;base64,aGVsbG8=' },
+      method: 'PUT', url: '/api/auth/me/avatar', headers, payload: { avatarUrl: 'data:image/png;base64,iVBORw0KGgo=' },
     });
     assert.equal(ownAvatar.statusCode, 200);
     assert.equal(updatedWhere.id, self);

@@ -18,7 +18,7 @@ function getSecret(name: 'JWT_SECRET') {
     || value.length < 32
     || value.startsWith('change-me')
     || value.includes('dev-secret')
-    || (process.env.NODE_ENV === 'production' && value === LOCAL_DEVELOPMENT_JWT_SECRET)
+    || value === LOCAL_DEVELOPMENT_JWT_SECRET
   ) {
     throw new Error(`${name} must be configured with at least 32 unpredictable characters`);
   }

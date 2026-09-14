@@ -74,7 +74,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     }
 
     const isAuthEntryPoint = path === '/api/auth/login' || path === '/api/auth/register';
-    if (response.status === 401 && accessToken && !isAuthEntryPoint) {
+    if (response.status === 401 && accessToken && accessToken === getAccessToken() && !isAuthEntryPoint) {
       clearSession();
     }
 
