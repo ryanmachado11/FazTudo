@@ -45,7 +45,7 @@ export default function Signup() {
       });
 
       toast.success('Cadastro realizado com sucesso! Faça login para continuar.');
-      navigate('/login');
+      navigate('/login', { replace: true });
     } catch (error: any) {
       if (error instanceof ApiError && error.payload?.issues?.fieldErrors) {
         setFieldErrors(error.payload.issues.fieldErrors);

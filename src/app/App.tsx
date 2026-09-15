@@ -96,7 +96,7 @@ export default function App() {
     <BrowserRouter>
       <Suspense fallback={<div className="min-h-screen grid place-items-center text-muted-foreground">Carregando...</div>}>
         <Routes>
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<RequireGuest><LandingPage /></RequireGuest>} />
           <Route path="/home" element={<RequireRole roles={['CLIENT', 'PROVIDER']}><ClientHome /></RequireRole>} />
           <Route path="/prestador/:id" element={<ProviderProfile />} />
           <Route path="/chat/room/:conversationId" element={<RequireRole roles={['CLIENT', 'PROVIDER']}><Chat /></RequireRole>} />

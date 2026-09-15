@@ -59,7 +59,7 @@ export async function providersRoutes(app: FastifyInstance) {
     return providers.map((provider: any) => ({
       id: provider.user.id,
       name: provider.user.name,
-      avatarUrl: provider.user.avatarUrl,
+      avatarUrl: provider.user.avatarUrl ? `/api/providers/${provider.user.id}/avatar` : null,
       category: provider.categories[0]?.category.name ?? 'Prestador',
       categoryId: provider.categories[0]?.category.id ?? null,
       rating: Number(provider.averageRating),
@@ -157,5 +157,23 @@ export async function providersRoutes(app: FastifyInstance) {
         comment: r.comment,
       })),
     };
+  });
+
+  app.get('/:id/avatar', async (request, reply) => {
+    const parsed = z.object({ id: z.string().uuid() }).safeParse(request.params);
+    if (!parsed.success) return reply.code(400).send({ error: 'Invalid provider id' });
+
+    const provider = await prisma.providerProfile.findUnique({
+      where: { userId: parsed.data.id },
+      select: { user: { select: { role: true, isActive: true, avatarUrl: true } } },
+    });
+    const avatarUrl = provider?.user.role === 'PROVIDER' && provider.user.isActive
+      ? provider.user.avatarUrl
+      : null;
+    if (!avatarUrl) return reply.code(404).send({ error: 'Avatar not found' });
+
+    const match = /^data:image\/(png|jpeg|webp|gif);base64,/.exec(avatarUrl);
+    if (!match) return reply.code(404).send({ error: 'Avatar not found' });
+    return reply.type(`image/${match[1]}`).send(Buffer.from(avatarUrl.slice(match[0].length), 'base64'));
   });
 }

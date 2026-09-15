@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -47,6 +47,8 @@ const popularSearches = ['Pintor', 'Eletricista', 'Vazamento', 'Ar-Condicionado'
 
 export default function ClientHome() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const categorySlug = searchParams.get('categoria');
   const { user: authenticatedUser } = useAuth();
   const currentUser = authenticatedUser || getCurrentUser();
   const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(currentUser?.avatarUrl ?? null);
@@ -61,6 +63,7 @@ export default function ClientHome() {
   const [providersRetryKey, setProvidersRetryKey] = useState(0);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const lastCategorySlug = useRef<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -83,6 +86,24 @@ export default function ClientHome() {
   useEffect(() => {
     setProfileAvatarUrl(currentUser?.avatarUrl ?? null);
   }, [currentUser?.id, currentUser?.avatarUrl]);
+
+  useEffect(() => {
+    const slugChanged = lastCategorySlug.current !== categorySlug;
+    lastCategorySlug.current = categorySlug;
+    if (!categorySlug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(categorySlug)) {
+      if (slugChanged) {
+        setSelectedCategory(null);
+        setSelectedSubcategory(null);
+      }
+      return;
+    }
+    const catalog = categories.length > 0 ? categories : serviceCategories;
+    const category = catalog.find((cat) => (cat.slug || cat.id) === categorySlug);
+    if (category) {
+      setSelectedCategory(category);
+      setSelectedSubcategory(null);
+    }
+  }, [categorySlug, categories]);
 
   const handleScroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
@@ -179,6 +200,7 @@ export default function ClientHome() {
               <div
                 data-profile-navigation
                 onClickCapture={(event) => {
+                  if (currentUser?.role !== 'PROVIDER') return;
                   const target = event.target as HTMLElement;
                   if (target.closest('button.text-destructive')) return;
                   event.preventDefault();
@@ -518,7 +540,7 @@ export default function ClientHome() {
                     {/* Avatar */}
                     <div className="flex-shrink-0">
                       <Avatar className="h-20 w-20 border-2 border-secondary/20">
-                        {prof.avatarUrl && <AvatarImage src={prof.avatarUrl} alt={`Foto de ${prof.name}`} />}
+                        {prof.avatarUrl && <AvatarImage src={`${import.meta.env.VITE_API_BASE_URL || ''}${prof.avatarUrl}`} alt={`Foto de ${prof.name}`} loading="lazy" />}
                         <AvatarFallback className="bg-secondary/20 text-secondary text-lg font-bold">
                           {prof.name.split(' ').map((n: string) => n[0]).join('')}
                         </AvatarFallback>

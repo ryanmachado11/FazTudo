@@ -126,6 +126,11 @@ export default function Chat() {
           const roomMessages = await apiGet<any[]>(`/api/chat/rooms/${roomId}/messages?limit=100`);
           if (isMounted) {
             setMessages(roomMessages);
+            if (document.visibilityState === 'visible' && roomMessages.some((msg) =>
+              msg.senderId !== currentUser?.id && msg.isRead === false,
+            )) {
+              await apiPost(`/api/chat/rooms/${roomId}/read`, {});
+            }
           }
         }
       } catch {
@@ -143,7 +148,7 @@ export default function Chat() {
       isMounted = false;
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [roomId]);
+  }, [roomId, currentUser?.id]);
 
   const handleSend = async () => {
     if (!message.trim() || !roomId || isSending) return;

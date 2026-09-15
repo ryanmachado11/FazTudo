@@ -97,7 +97,7 @@ export async function providerProfileRoutes(app: FastifyInstance) {
           userId: user.sub,
           bio: bio ?? '',
           specialties: specialties ?? [],
-          city: city ?? 'SÃ£o Paulo',
+          city: city ?? 'São Paulo',
           neighborhood: neighborhood ?? '',
           state: state ?? 'SP',
           hourlyRate: hourlyRate ?? 0,

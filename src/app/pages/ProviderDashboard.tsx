@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
@@ -118,8 +118,12 @@ export default function ProviderDashboard() {
   const [loadError, setLoadError] = useState('');
   const [retryKey, setRetryKey] = useState(0);
   const [updatingRequestId, setUpdatingRequestId] = useState<string | null>(null);
+  const requestUpdateVersion = useRef(0);
 
   useEffect(() => {
+    let active = true;
+    let initialLoaded = false;
+    let pollInFlight = false;
     const loadDashboard = async () => {
       setLoading(true);
       setLoadError('');
@@ -132,17 +136,37 @@ export default function ProviderDashboard() {
           }),
         ]);
 
+        if (!active) return;
         setDashboard(dashboardData);
         setProfile(profileData);
+        initialLoaded = true;
       } catch (error) {
+        if (!active) return;
         console.error(error);
         setLoadError('Não foi possível carregar o painel do prestador.');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     loadDashboard();
+    const intervalId = window.setInterval(async () => {
+      if (!initialLoaded || pollInFlight || requestUpdateVersion.current % 2 !== 0) return;
+      pollInFlight = true;
+      const version = requestUpdateVersion.current;
+      try {
+        const dashboardData = await apiGet<DashboardPayload>('/api/provider/dashboard');
+        if (active && version === requestUpdateVersion.current) setDashboard(dashboardData);
+      } catch {
+        // Keep the current dashboard visible and try again on the next interval.
+      } finally {
+        pollInFlight = false;
+      }
+    }, 10_000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
   }, [retryKey]);
 
   const providerName = profile?.name || currentUser?.name || 'Prestador';
@@ -171,6 +195,7 @@ export default function ProviderDashboard() {
     if (status === 'CANCELLED' && !window.confirm('Deseja cancelar este serviço?')) return;
 
     try {
+      requestUpdateVersion.current += 1;
       setUpdatingRequestId(requestId);
       await apiPatch(`/api/services/${requestId}/status`, { status });
       setDashboard((current) => {
@@ -201,6 +226,7 @@ export default function ProviderDashboard() {
       toast.error(error?.message || 'Não foi possível atualizar o serviço.');
       if (error instanceof ApiError && error.status === 409) setRetryKey((current) => current + 1);
     } finally {
+      requestUpdateVersion.current += 1;
       setUpdatingRequestId(null);
     }
   };
